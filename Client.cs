@@ -14,7 +14,7 @@ using System.Timers;
 
 namespace NAT_Test
 {
-	public struct TestResult
+	public class TestResult
 	{
 		public enum Behavior 
 		{
@@ -122,16 +122,11 @@ namespace NAT_Test
 
 	class Client
 	{
-		struct Server
-		{
-			public IPEndPoint m_udpAddr1 = null;
-			public IPEndPoint m_udpAddr2 = null;
-		}
+		IPEndPoint m_mainServer_udp1 = null;
 
+		IPEndPoint m_mainServer_udp2 = null;
 
-		Server m_mainServer;
-
-		Server m_subServer;
+		IPEndPoint m_subServer_udp = null;
 
 		public Client(IPEndPoint a_mainServer_udp1,
 					  IPEndPoint a_mainServer_udp2,
@@ -160,9 +155,9 @@ namespace NAT_Test
 											+ " a_subServer_udp:" + a_subServer_udp.Address.ToString());
 			}
 
-			m_mainServer.m_udpAddr1 = a_mainServer_udp1;
-			m_mainServer.m_udpAddr2 = a_mainServer_udp2;
-			m_subServer.m_udpAddr1 = a_subServer_udp;
+			m_mainServer_udp1 = a_mainServer_udp1;
+			m_mainServer_udp2 = a_mainServer_udp2;
+			m_subServer_udp = a_subServer_udp;
 		}
 
 
@@ -177,7 +172,7 @@ namespace NAT_Test
 			// Step 1. Filtering Behavior Test
 			{
 				Guid ctxID;
-				Timer sendWorker = CreateSendWorker(mainIO, m_mainServer.m_udpAddr1, out ctxID);
+				Timer sendWorker = CreateSendWorker(mainIO, m_mainServer_udp1, out ctxID);
 
 				int recvTimeout = Config.Timeout_Ms;
 				bool isTimeout = false;
@@ -193,17 +188,17 @@ namespace NAT_Test
 						ref recvTimeout,
 						(IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
 						{
-							if (a_sender.Equals(m_mainServer.m_udpAddr1)) {
+							if (a_sender.Equals(m_mainServer_udp1)) {
 								if (result.PublicUdpAddress_1 != null)
 									return false;
 								result.PublicUdpAddress_1 = a_publicAddress;
 							}
-							else if (a_sender.Equals(m_mainServer.m_udpAddr2)) {
+							else if (a_sender.Equals(m_mainServer_udp2)) {
 								if (result.PublicUdpAddress_2 != null)
 									return false;
 								result.PublicUdpAddress_2 = a_publicAddress;
 							}
-							else if (a_sender.Equals(m_subServer.m_udpAddr1)) {
+							else if (a_sender.Equals(m_subServer_udp)) {
 								if (result.PublicUdpAddress_3 != null)
 									return false;
 								result.PublicUdpAddress_3 = a_publicAddress;
@@ -280,12 +275,12 @@ namespace NAT_Test
 				Debug.Assert(result.FilteringBehavior == TestResult.Behavior.Address_and_Port_Dependent);
 
 				Guid ctxID;
-				Timer sendWorker = CreateSendWorker(mainIO, m_mainServer.m_udpAddr2, out ctxID);
+				Timer sendWorker = CreateSendWorker(mainIO, m_mainServer_udp2, out ctxID);
 
 				int recvTimeout = Config.Timeout_Ms;
 				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout, (IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
 				{
-					if (a_sender.Equals(m_mainServer.m_udpAddr2) == false) {
+					if (a_sender.Equals(m_mainServer_udp2) == false) {
 						System.Console.Error.WriteLine("엉뚱한 sender : " + a_sender.ToString());
 						return false;
 					}
@@ -316,12 +311,12 @@ namespace NAT_Test
 				Debug.Assert(result.PublicUdpAddress_3 == null);
 
 				Guid ctxID;
-				Timer sendWorker = CreateSendWorker(mainIO, m_subServer.m_udpAddr1, out ctxID);
+				Timer sendWorker = CreateSendWorker(mainIO, m_subServer_udp, out ctxID);
 
 				int recvTimeout = Config.Timeout_Ms;
 				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout, (IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
 				{
-					if (a_sender.Equals(m_subServer.m_udpAddr1) == false) {
+					if (a_sender.Equals(m_subServer_udp) == false) {
 						System.Console.Error.WriteLine("엉뚱한 sender : " + a_sender.ToString());
 						return false;
 					}

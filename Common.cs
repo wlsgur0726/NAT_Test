@@ -9,20 +9,20 @@ using System.Threading;
 
 namespace NAT_Test
 {
-	static struct Config
+	class Config
 	{
-		public static const int Message_Max_Length = 8 * 1024;
-		public static const int Timeout_Ms = 5 * 1000;
-		public static const int Retransmission_Interval_Ms = 1000;
-		public static const Formatting JsonFormatting = Formatting.None;
+		public static readonly int Message_Max_Length = 8 * 1024;
+		public static readonly int Timeout_Ms = 5 * 1000;
+		public static readonly int Retransmission_Interval_Ms = 1000;
+		public static readonly Formatting JsonFormatting = Formatting.None;
 	}
 
 
 
 	class Message
 	{
-		public static const string Type_Request = "Request";
-		public static const string Type_Response = "Response";
+		public static readonly string Type_Request = "Request";
+		public static readonly string Type_Response = "Response";
 
 		public string m_contextID = "";
 		public int m_contextSeq = -1;
@@ -159,7 +159,7 @@ namespace NAT_Test
 			ioArgs.Completed += (object a_sender, SocketAsyncEventArgs a_evCtx) =>
 			{
 				if (a_evCtx.SocketError != SocketError.Success) {
-					throw new SocketException(a_evCtx.SocketError);
+					System.Console.Error.WriteLine(a_evCtx.SocketError.ToString());
 				}
 			};
 			m_socket.SendToAsync(ioArgs);
