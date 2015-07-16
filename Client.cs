@@ -114,13 +114,29 @@ namespace NAT_Test
 
 		public override string ToString()
 		{
-			return JsonConvert.SerializeObject(this, Formatting.Indented);
+			string str = base.ToString()
+				+ "\nComplete                 :  " + Complete
+				+ "\nComment                  :  " + Comment
+				+ "\nAvailable_Communication  :  " + Available_Communication
+				+ "\nExit_NAT                 :  " + Exit_NAT
+				+ "\nPrivateUdpAddress_1      :  " + PrivateUdpAddress_1
+				+ "\nPrivateUdpAddress_2      :  " + PrivateUdpAddress_2
+				+ "\nPublicUdpAddress_1       :  " + PublicUdpAddress_1
+				+ "\nPublicUdpAddress_2       :  " + PublicUdpAddress_2
+				+ "\nPublicUdpAddress_3       :  " + PublicUdpAddress_3
+				+ "\nPublicUdpAddress_4       :  " + PublicUdpAddress_4
+				+ "\nPublicUdpAddress_5       :  " + PublicUdpAddress_5
+				+ "\nMappingBehavior          :  " + MappingBehavior.ToString()
+				+ "\nFilteringBehavior        :  " + FilteringBehavior.ToString()
+				+ "\nSupportedHairpin         :  " + SupportedHairpin.ToString();
+
+			return str;
 		}
 	}
 
 
 
-	class Client
+	public class Client
 	{
 		IPEndPoint m_mainServer_udp1 = null;
 

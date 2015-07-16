@@ -9,7 +9,7 @@ using System.Threading;
 
 namespace NAT_Test
 {
-	class Config
+	public class Config
 	{
 		public static readonly int Message_Max_Length = 8 * 1024;
 		public static readonly int Timeout_Ms = 5 * 1000;
@@ -36,6 +36,11 @@ namespace NAT_Test
 		{
 			return m_contextSeq > 0
 				&& m_type != "";
+		}
+
+		public bool AddressIsEmpty()
+		{
+			return m_port == -1 || m_address.Equals("");
 		}
 
 		public static Message NewRequest()
@@ -117,8 +122,8 @@ namespace NAT_Test
 
 					m_recvArgs.SetBuffer(0, recvBuf.Length);
 					m_socket.ReceiveFromAsync(m_recvArgs);
-
 				};
+				m_recvArgs.RemoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
 				m_socket.ReceiveFromAsync(m_recvArgs);
 			}
 		}
@@ -159,7 +164,7 @@ namespace NAT_Test
 			ioArgs.Completed += (object a_sender, SocketAsyncEventArgs a_evCtx) =>
 			{
 				if (a_evCtx.SocketError != SocketError.Success) {
-					System.Console.Error.WriteLine(a_evCtx.SocketError.ToString());
+					System.Console.Error.WriteLine("SendCompletion Error : " + a_evCtx.SocketError.ToString());
 				}
 			};
 			m_socket.SendToAsync(ioArgs);
