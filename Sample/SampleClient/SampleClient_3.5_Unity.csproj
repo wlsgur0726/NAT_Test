@@ -4,11 +4,11 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{6E331A78-AD5B-484E-B965-5A901495616A}</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <ProjectGuid>{F70018D9-BB73-4563-9858-4DBFC97BA21A}</ProjectGuid>
+    <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>NAT_Test</RootNamespace>
-    <AssemblyName>NAT_Test</AssemblyName>
+    <RootNamespace>SampleClient</RootNamespace>
+    <AssemblyName>SampleClient</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile>Unity Full v3.5</TargetFrameworkProfile>
@@ -32,24 +32,34 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
-  <PropertyGroup>
-    <StartupObject />
-  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="SampleCient.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\Newtonsoft.Json\Src\Newtonsoft.Json\bin\Debug\Net35\Newtonsoft.Json.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
+    <ProjectReference Include="..\..\NAT_Test_3.5_Unity.csproj">
+      <Project>{6e331a78-ad5b-484e-b965-5a901495616a}</Project>
+      <Name>NAT_Test_3.5_Unity</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\SampleCommon\SampleCommon_3.5_Unity.csproj">
+      <Project>{7d64a86f-1075-4b27-acd3-740d42003a8e}</Project>
+      <Name>SampleCommon_3.5_Unity</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Client.cs" />
-    <Compile Include="Common.cs" />
-    <Compile Include="MainServer.cs" />
-    <Compile Include="SubServer.cs" />
+    <WCFMetadata Include="Service References\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

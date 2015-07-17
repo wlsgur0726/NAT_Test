@@ -44,9 +44,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\NAT_Test.csproj">
+    <ProjectReference Include="..\..\NAT_Test_3.5_Unity.csproj">
       <Project>{6e331a78-ad5b-484e-b965-5a901495616a}</Project>
-      <Name>NAT_Test</Name>
+      <Name>NAT_Test_3.5_Unity</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
