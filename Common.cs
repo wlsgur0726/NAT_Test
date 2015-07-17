@@ -52,6 +52,11 @@ namespace NAT_Test
 		{
 			return m_port == -1 || m_address.Equals("");
 		}
+
+		public static string ContextString(int a_contextID, int a_contextSeq)
+		{
+			return "[" + String.Format("{0:X}", a_contextID) + ":" + a_contextSeq + "]";
+		}
 	}
 
 

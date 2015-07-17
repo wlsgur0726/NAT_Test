@@ -47,10 +47,9 @@ namespace NAT_Test
 					++msg.m_contextSeq;
 
 					if (msg.m_contextID != 0) { // 0은 Heartbeat이므로 출력하지 않는다.
-						Config.OnEventDelegate(
-							"Requested from " + sender.ToString() +
-							", context=(" + msg.m_contextID + ":" + msg.m_contextSeq + ")");
-						Config.OnEventDelegate("Response to " + dst.ToString());
+						string ctxstr = " " + Message.ContextString(msg.m_contextID, msg.m_contextSeq);
+						Config.OnEventDelegate("Requested from " + sender.ToString() + ctxstr);
+						Config.OnEventDelegate("Response to " + dst.ToString() + ctxstr);
 					}
 
 					io.SendTo(msg, dst);

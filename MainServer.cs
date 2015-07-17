@@ -89,13 +89,15 @@ namespace NAT_Test
 					msg.m_address = sender.Address.ToString();
 					msg.m_port = sender.Port;
 
-					Config.OnEventDelegate(
-						"[" + name + "] Requested from " + sender.ToString() +
-						", context=(" + msg.m_contextID + ":" + msg.m_contextSeq + ")");
-
+					string ctxstr = " " + Message.ContextString(msg.m_contextID, msg.m_contextSeq);
+					Config.OnEventDelegate("[" + name + "] Requested from " + sender.ToString() + ctxstr);
+					Config.OnEventDelegate("[" + name + "] Response to " + sender.ToString() + ctxstr);
+					
 					io.SendTo(msg, sender);
-					if (isFirstUdp)
+					if (isFirstUdp) {
+						Config.OnEventDelegate("[" + name + "] Pass to " + m_subServerAddr_udp.ToString() + ctxstr);
 						m_subServer_udp.SendTo(msg, m_subServerAddr_udp);
+					}
 				}
 			};
 

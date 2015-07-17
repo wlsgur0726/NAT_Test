@@ -198,25 +198,29 @@ namespace NAT_Test
 				do
 				{
 					isTimeout = ! WaitForRecvEvent(ctxID, mainIO, ref recvTimeout,
-						(IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
+						(IPEndPoint a_sender, IPEndPoint a_publicAddress, int a_contextID, int a_contextSeq) =>
 						{
-							string addrstr = " (" + a_publicAddress.ToString() + ")";
+							string ctxstr = Message.ContextString(a_contextID, a_contextSeq);
+							string addrstr = "(" + a_publicAddress.ToString() + ")";
 							if (a_sender.Equals(m_mainServer_udp1)) {
 								if (result.PublicUdpAddress_1 != null)
 									return false;
-								Config.OnEventDelegate("MainServer의 First UDP로부터 Response 수신 성공" + addrstr);
+								Config.OnEventDelegate(
+									"MainServer의 First UDP로부터 Response" + addrstr + " 수신 성공 " + ctxstr);
 								result.PublicUdpAddress_1 = a_publicAddress;
 							}
 							else if (a_sender.Equals(m_mainServer_udp2)) {
 								if (result.PublicUdpAddress_2 != null)
 									return false;
-								Config.OnEventDelegate("MainServer의 Second UDP로부터 Response 수신 성공" + addrstr);
+								Config.OnEventDelegate(
+									"MainServer의 Second UDP로부터 Response" + addrstr + " 수신 성공" + ctxstr);
 								result.PublicUdpAddress_2 = a_publicAddress;
 							}
 							else if (a_sender.Equals(m_subServer_udp)) {
 								if (result.PublicUdpAddress_3 != null)
 									return false;
-								Config.OnEventDelegate("SubServer로부터 Response 수신 성공" + addrstr);
+								Config.OnEventDelegate(
+									"SubServer로부터 Response" + addrstr + " 수신 성공" + ctxstr);
 								result.PublicUdpAddress_3 = a_publicAddress;
 							}
 							else {
@@ -305,9 +309,11 @@ namespace NAT_Test
 				Timer sendWorker = CreateSendWorker(mainIO, m_mainServer_udp2, out ctxID);
 
 				int recvTimeout = Config.Timeout_Ms;
-				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout, 
-					(IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
+				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout,
+					(IPEndPoint a_sender, IPEndPoint a_publicAddress, int a_contextID, int a_contextSeq) =>
 					{
+						string ctxstr = Message.ContextString(a_contextID, a_contextSeq);
+						string addrstr = "(" + a_publicAddress.ToString() + ")";
 						if (a_sender.Equals(m_mainServer_udp2) == false) {
 							Config.OnErrorDelegate("엉뚱한 sender : " + a_sender.ToString());
 							return false;
@@ -316,7 +322,7 @@ namespace NAT_Test
 							return false;
 
 						Config.OnEventDelegate(
-							"MainServer의 Second UDP로부터 Response 수신 성공 (" + a_publicAddress.ToString() + ")");
+							"MainServer의 Second UDP로부터 Response" + addrstr + " 수신 성공" + ctxstr);
 						result.PublicUdpAddress_2 = a_publicAddress;
 						return true;
 					}
@@ -354,8 +360,10 @@ namespace NAT_Test
 
 				int recvTimeout = Config.Timeout_Ms;
 				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout,
-					(IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
+					(IPEndPoint a_sender, IPEndPoint a_publicAddress, int a_contextID, int a_contextSeq) =>
 					{
+						string ctxstr = Message.ContextString(a_contextID, a_contextSeq);
+						string addrstr = "(" + a_publicAddress.ToString() + ")";
 						if (a_sender.Equals(m_subServer_udp) == false) {
 							Config.OnErrorDelegate("엉뚱한 sender : " + a_sender.ToString());
 							return false;
@@ -364,7 +372,7 @@ namespace NAT_Test
 							return false;
 
 						Config.OnEventDelegate(
-							"SubServer로부터 Response 수신 성공 (" + a_publicAddress.ToString() + ")");
+							"SubServer로부터 Response" + addrstr + " 수신 성공" + ctxstr);
 						result.PublicUdpAddress_3 = a_publicAddress;
 						return true;
 					}
@@ -410,12 +418,13 @@ namespace NAT_Test
 
 				int recvTimeout = Config.Timeout_Ms;
 				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout,
-					(IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
+					(IPEndPoint a_sender, IPEndPoint a_publicAddress, int a_contextID, int a_contextSeq) =>
 					{
+						string ctxstr = Message.ContextString(a_contextID, a_contextSeq);
 						if (result.PublicUdpAddress_5 != null)
 							return false;
 
-						Config.OnEventDelegate(a_sender.ToString() + "로부터 Request 수신");
+						Config.OnEventDelegate(a_sender.ToString() + "로부터 Request 수신 " + ctxstr);
 						result.PublicUdpAddress_5 = a_sender;
 						return true;
 					}
@@ -436,12 +445,13 @@ namespace NAT_Test
 
 					recvTimeout = Config.Timeout_Ms;
 					WaitForRecvEvent(ctxID, subIO, ref recvTimeout,
-						(IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
+						(IPEndPoint a_sender, IPEndPoint a_publicAddress, int a_contextID, int a_contextSeq) =>
 						{
+							string ctxstr = Message.ContextString(a_contextID, a_contextSeq);
 							if (result.PublicUdpAddress_4 != null)
 								return false;
 
-							Config.OnEventDelegate(a_sender.ToString() + "로부터 Request 수신");
+							Config.OnEventDelegate(a_sender.ToString() + "로부터 Request 수신 " + ctxstr);
 							result.PublicUdpAddress_4 = a_sender;
 							return true;
 						}
@@ -524,8 +534,8 @@ namespace NAT_Test
 			timer.Elapsed += new ElapsedEventHandler((object a_sender, ElapsedEventArgs a_eArgs) =>
 			{
 				Config.OnEventDelegate(
-					" request to " + a_dest.ToString() + 
-					"... (" + req.m_contextID + ":" + req.m_contextSeq + ")");
+					" request to " + a_dest.ToString() + "... " + 
+					Message.ContextString(req.m_contextID, req.m_contextSeq));
 				req.m_pingTime = System.Environment.TickCount;
 				a_io.SendTo(req, a_dest);
 			});
@@ -536,7 +546,9 @@ namespace NAT_Test
 
 
 		delegate bool OnResponse(IPEndPoint a_sender, 
-								 IPEndPoint a_publicAddress);
+								 IPEndPoint a_publicAddress,
+								 int a_contextID,
+								 int a_contexSeq);
 
 		bool WaitForRecvEvent(int a_contextID,
 							  SocketIo a_io, 
@@ -559,7 +571,14 @@ namespace NAT_Test
 				IPEndPoint publicAddress = new IPEndPoint(IPAddress.Parse(res.m_address),
 														  res.m_port);
 
-				if (res.m_contextID!=a_contextID || a_callback(sender, publicAddress)==false) {
+				bool valid = res.m_contextID == a_contextID;
+				if (valid) {
+					valid = a_callback(sender,
+									   publicAddress,
+									   a_contextID,
+									   res.m_contextSeq);
+				}
+				if (valid == false) {
 					a_timeoutMs -= (int)stopwatch.ElapsedMilliseconds;
 					if (a_timeoutMs > 0)
 						continue;
