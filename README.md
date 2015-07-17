@@ -4,7 +4,7 @@ Client가 속한 NAT의 behavior를 테스트한다.
 
 
 # 테스트 시 주의사항
- - MainServer와 SubServer는 테스트할 NAT의 바로 상위 레이어에서 실행해야 한다.
+ - MainServer와 SubServer는 테스트 할 NAT의 바깥에서 실행해야 한다.
  - MainServer에서는 2개의 UDP Port를 열어야 하는데 둘의 IP는 반드시 동일하게 Bind해야 한다.
  - MainServer와 SubServer는 반드시 Public IP가 달라야 한다. (따라서 두 서버는 같은 NAT 밑에서 실행해선 안된다.)
 
