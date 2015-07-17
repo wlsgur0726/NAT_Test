@@ -187,7 +187,7 @@ namespace NAT_Test
 
 			// Step 1. Filtering Behavior Test
 			{
-				Guid ctxID;
+				int ctxID;
 				Timer sendWorker = CreateSendWorker(mainIO, m_mainServer_udp1, out ctxID);
 
 				int recvTimeout = Config.Timeout_Ms;
@@ -220,7 +220,7 @@ namespace NAT_Test
 								result.PublicUdpAddress_3 = a_publicAddress;
 							}
 							else {
-								System.Console.Error.WriteLine("엉뚱한 sender : " + a_sender.ToString());
+								Config.OnErrorDelegate("엉뚱한 sender : " + a_sender.ToString());
 								return false;
 							}
 
@@ -246,10 +246,10 @@ namespace NAT_Test
 				if (result.PublicUdpAddress_1.Equals(result.PrivateUdpAddress_1)) {
 					// 내부주소와 외부주소가 같은 경우
 					if (result.PublicUdpAddress_2 == null) {
-						System.Console.Error.WriteLine("NAT가 없는 상황에서 PublicAddress_2를 수신하지 못함.");
+						Config.OnErrorDelegate("NAT가 없는 상황에서 PublicAddress_2를 수신하지 못함.");
 					}
 					if (result.PublicUdpAddress_3 == null) {
-						System.Console.Error.WriteLine("NAT가 없는 상황에서 PublicAddress_3을 수신하지 못함.");
+						Config.OnErrorDelegate("NAT가 없는 상황에서 PublicAddress_3을 수신하지 못함.");
 					}
 
 					result.Exit_NAT = false;
@@ -262,7 +262,7 @@ namespace NAT_Test
 				if (result.PublicUdpAddress_3 != null) {
 					// IP와 Port가 아예 다른 SubServer로부터 메시지를 수신한 경우
 					if (result.PublicUdpAddress_2 == null) {
-						System.Console.Error.WriteLine("Full-Cone NAT 상황에서 PublicAddress_2를 수신하지 못함.");
+						Config.OnErrorDelegate("Full-Cone NAT 상황에서 PublicAddress_2를 수신하지 못함.");
 					}
 					// MappingBehavior 확정 가능
 					result.MappingBehavior = TestResult.Behavior.Endpoint_Independent;
@@ -290,14 +290,14 @@ namespace NAT_Test
 				Debug.Assert(result.MappingBehavior == TestResult.Behavior.None);
 				Debug.Assert(result.FilteringBehavior == TestResult.Behavior.Address_and_Port_Dependent);
 
-				Guid ctxID;
+				int ctxID;
 				Timer sendWorker = CreateSendWorker(mainIO, m_mainServer_udp2, out ctxID);
 
 				int recvTimeout = Config.Timeout_Ms;
 				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout, (IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
 				{
 					if (a_sender.Equals(m_mainServer_udp2) == false) {
-						System.Console.Error.WriteLine("엉뚱한 sender : " + a_sender.ToString());
+						Config.OnErrorDelegate("엉뚱한 sender : " + a_sender.ToString());
 						return false;
 					}
 					result.PublicUdpAddress_2 = a_publicAddress;
@@ -326,14 +326,14 @@ namespace NAT_Test
 				Debug.Assert(result.PublicUdpAddress_1.Equals(result.PublicUdpAddress_2));
 				Debug.Assert(result.PublicUdpAddress_3 == null);
 
-				Guid ctxID;
+				int ctxID;
 				Timer sendWorker = CreateSendWorker(mainIO, m_subServer_udp, out ctxID);
 
 				int recvTimeout = Config.Timeout_Ms;
 				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout, (IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
 				{
 					if (a_sender.Equals(m_subServer_udp) == false) {
-						System.Console.Error.WriteLine("엉뚱한 sender : " + a_sender.ToString());
+						Config.OnErrorDelegate("엉뚱한 sender : " + a_sender.ToString());
 						return false;
 					}
 					result.PublicUdpAddress_3 = a_publicAddress;
@@ -369,7 +369,7 @@ namespace NAT_Test
 				CreateSocketIO(ProtocolType.Udp, out subIO, out result.PrivateUdpAddress_2);
 				Debug.Assert(result.PrivateUdpAddress_1.Equals(result.PrivateUdpAddress_2) == false);
 
-				Guid ctxID;
+				int ctxID;
 				// Sub -> Main
 				Timer sendWorker = CreateSendWorker(subIO, result.PublicUdpAddress_1, out ctxID);
 
@@ -452,13 +452,12 @@ namespace NAT_Test
 
 
 
-		Timer CreateSendWorker(SocketIo a_io, IPEndPoint a_dest, out Guid a_contextID)
+		Timer CreateSendWorker(SocketIo a_io, IPEndPoint a_dest, out int a_contextID)
 		{
-			a_contextID = Guid.NewGuid();
+			a_contextID = Config.Random.Next(int.MaxValue);
 			Message req = new Message();
-			req.m_type = Message.Type_Request;
 			req.m_contextSeq = 1;
-			req.m_contextID = a_contextID.ToString();
+			req.m_contextID = a_contextID;
 
 			Timer timer = new Timer();
 			timer.Interval = Config.Retransmission_Interval_Ms;
@@ -473,7 +472,8 @@ namespace NAT_Test
 
 
 		delegate bool OnResponse(IPEndPoint a_sender, IPEndPoint a_publicAddress);
-		bool WaitForRecvEvent(Guid a_contextID,
+
+		bool WaitForRecvEvent(int a_contextID,
 							  SocketIo a_io, 
 							  ref int a_timeoutMs,
 							  OnResponse a_callback)
@@ -491,10 +491,10 @@ namespace NAT_Test
 				if (isTimeout)
 					return false;
 
-				Guid ctxID = Guid.Parse(res.m_contextID);
 				IPEndPoint publicAddress = new IPEndPoint(IPAddress.Parse(res.m_address),
 														  res.m_port);
-				if (ctxID.Equals(a_contextID)==false || a_callback(sender, publicAddress)==false) {
+
+				if (res.m_contextID!=a_contextID || a_callback(sender, publicAddress)==false) {
 					a_timeoutMs -= (int)stopwatch.ElapsedMilliseconds;
 					if (a_timeoutMs > 0)
 						continue;

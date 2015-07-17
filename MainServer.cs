@@ -6,7 +6,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace NAT_Test
 {
@@ -25,6 +24,7 @@ namespace NAT_Test
 		Thread m_thread1 = null;
 
 		Thread m_thread2 = null;
+
 		Thread m_heartbeatThread = null;
 
 		public MainServer(IPEndPoint a_bindAddr_udp1,
@@ -97,10 +97,6 @@ namespace NAT_Test
 					if (io.WaitForRecv(Config.Timeout_Ms, out msg, out sender) == false)
 						continue;
 
-					Guid tmp;
-					if (Guid.TryParse(msg.m_contextID, out tmp) == false)
-						continue;
-
 					++msg.m_contextSeq;
 					msg.m_address = sender.Address.ToString();
 					msg.m_port = sender.Port;
@@ -117,12 +113,12 @@ namespace NAT_Test
 				int timeoutCount = 0;
 
 				Message ping = new Message();
-				Guid pingPongCtx = Guid.NewGuid();
-				ping.m_contextID = pingPongCtx.ToString();
+				int pingPongCtx = Config.Random.Next(int.MaxValue);
+				ping.m_contextID = pingPongCtx;
 
 				while (m_run) {
 					if (timeoutCount >= 5) {
-						System.Console.Error.WriteLine("SubServer와의 통신이 되지 않고 있습니다.");
+						Config.OnErrorDelegate("SubServer와의 통신이 되지 않고 있습니다.");
 						--timeoutCount;
 					}
 					m_subUdp.SendTo(ping, m_subServerAddr_udp);
@@ -134,10 +130,9 @@ namespace NAT_Test
 						continue;
 					}
 
-					Guid ctx;
-					if (Guid.TryParse(pong.m_contextID, out ctx)==false || ctx.Equals(pingPongCtx)==false){
+					if (pong.m_contextID != pingPongCtx) {
 						++timeoutCount;
-						System.Console.Error.WriteLine("잘못된 메시지를 수신 : " + pong.ToString());
+						Config.OnErrorDelegate("잘못된 메시지를 수신 : " + pong.ToString());
 						continue;
 					}
 

@@ -5,7 +5,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace NAT_Test
 {
@@ -35,13 +34,7 @@ namespace NAT_Test
 					IPEndPoint sender;
 					if (io.WaitForRecv(Config.Timeout_Ms, out msg, out sender) == false)
 						continue;
-
-					Guid ctx;
-					if (Guid.TryParse(msg.m_contextID, out ctx) == false) {
-						System.Console.Error.WriteLine("잘못된 메시지를 수신 : " + msg.ToString());
-						continue;
-					}
-
+					
 					IPEndPoint dst;
 					if (msg.AddressIsEmpty())
 						dst = sender;

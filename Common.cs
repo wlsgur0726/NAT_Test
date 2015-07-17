@@ -11,20 +11,29 @@ namespace NAT_Test
 {
 	public class Config
 	{
-		public static readonly int Message_Max_Length = 8 * 1024;
-		public static readonly int Timeout_Ms = 5 * 1000;
-		public static readonly int Retransmission_Interval_Ms = 1000;
-		public static readonly Formatting JsonFormatting = Formatting.None;
+		public delegate void OnError(string a_errorMessage);
+
+		public static int Message_Max_Length = 8 * 1024;
+
+		public static int Timeout_Ms = 5 * 1000;
+
+		public static int Retransmission_Interval_Ms = 1000;
+
+		public static Formatting JsonFormatting = Formatting.None;
+
+		public static Random Random = new Random();
+
+		public static OnError OnErrorDelegate = (string a_errorMessage) =>
+		{
+			System.Console.Error.WriteLine(a_errorMessage);
+		};
 	}
 
 
 
 	class Message
 	{
-		public static readonly string Type_Request = "Request";
-		public static readonly string Type_Response = "Response";
-
-		public string m_contextID = "";
+		public int m_contextID = -1;
 		public int m_contextSeq = -1;
 		public int m_tick = Environment.TickCount;
 		public string m_type = "";
@@ -41,24 +50,6 @@ namespace NAT_Test
 		public bool AddressIsEmpty()
 		{
 			return m_port == -1 || m_address.Equals("");
-		}
-
-		public static Message NewRequest()
-		{
-			Message msg = new Message();
-			msg.m_contextSeq = 1;
-			msg.m_type = Type_Request;
-			return msg;
-		}
-
-		public static Message NewResponse(Message a_request, IPEndPoint a_publicAddress)
-		{
-			Message msg = new Message();
-			msg.m_contextSeq = a_request.m_contextSeq + 1;
-			msg.m_type = Type_Response;
-			msg.m_address = a_publicAddress.Address.ToString();
-			msg.m_port = a_publicAddress.Port;
-			return msg;
 		}
 	}
 
@@ -94,20 +85,19 @@ namespace NAT_Test
 				{
 					if (a_evCtx.BytesTransferred < 0) {
 						m_socket.Close();
-						m_socket.Dispose();
 						return;
 					}
 
 					a_evCtx.SocketError.ToString();
 					Int16 len = BitConverter.ToInt16(a_evCtx.Buffer, 0);
 					if (len + 2 != a_evCtx.BytesTransferred) {
-						System.Console.Error.WriteLine("invalid payload length : " + len);
+						Config.OnErrorDelegate("invalid payload length : " + len);
 					}
 					else {
 						string jsonMsg = Encoding.UTF8.GetString(a_evCtx.Buffer, 2, len);
 						Message msg = JsonConvert.DeserializeObject<Message>(jsonMsg);
 						if (msg.IsValid() == false) {
-							System.Console.Error.WriteLine("invalid message : " + jsonMsg);
+							Config.OnErrorDelegate("invalid message : " + jsonMsg);
 						}
 						else {
 							lock (m_recvedMessageQueue) {
@@ -164,7 +154,7 @@ namespace NAT_Test
 			ioArgs.Completed += (object a_sender, SocketAsyncEventArgs a_evCtx) =>
 			{
 				if (a_evCtx.SocketError != SocketError.Success) {
-					System.Console.Error.WriteLine("SendCompletion Error : " + a_evCtx.SocketError.ToString());
+					Config.OnErrorDelegate("SendCompletion Error : " + a_evCtx.SocketError.ToString());
 				}
 			};
 			m_socket.SendToAsync(ioArgs);
