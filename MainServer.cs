@@ -74,9 +74,10 @@ namespace NAT_Test
 			m_run = true;
 			ParameterizedThreadStart threadRoutine = (object a_data) =>
 			{
-				SocketIo io = (SocketIo)a_data;
-				bool isFirstUdp = io.Equals(m_udp1);
-				string name = isFirstUdp ? "FirstUDP" : "SecondUDP";
+				var param = (Tuple<SocketIo, bool, string>)(a_data);
+				SocketIo io = param.Item1;
+				bool isFirstUdp = param.Item2;
+				string name = param.Item3;
 
 				while (m_run) {
 					Message msg;
@@ -84,17 +85,17 @@ namespace NAT_Test
 					if (io.WaitForRecv(Config.Timeout_Ms, out msg, out sender) == false)
 						continue;
 
-					Config.OnEventDelegate(
-						"[" + name + "] Requested from " + sender.ToString() + 
-						", context=(" + msg.m_contextID + ":" + msg.m_contextSeq + ")");
-
 					++msg.m_contextSeq;
 					msg.m_address = sender.Address.ToString();
 					msg.m_port = sender.Port;
 
+					Config.OnEventDelegate(
+						"[" + name + "] Requested from " + sender.ToString() +
+						", context=(" + msg.m_contextID + ":" + msg.m_contextSeq + ")");
+
 					io.SendTo(msg, sender);
 					if (isFirstUdp)
-						m_subServer_udp.SendTo(msg, sender);
+						m_subServer_udp.SendTo(msg, m_subServerAddr_udp);
 				}
 			};
 
@@ -110,12 +111,18 @@ namespace NAT_Test
 				ping.m_contextID = pingPongCtx;
 
 				while (m_run) {
-					if (timeoutCount >= 5) {
-						Config.OnErrorDelegate("SubServer와의 통신이 되지 않고 있습니다.");
-						--timeoutCount;
+					int interval;
+					if (timeoutCount == 0)
+						interval = Config.Timeout_Ms;
+					else {
+						interval = Config.Retransmission_Interval_Ms;
+						if (timeoutCount >= 5) {
+							Config.OnErrorDelegate("SubServer와의 통신이 되지 않고 있습니다.");
+							--timeoutCount;
+						}
 					}
 
-					Thread.Sleep(Config.Timeout_Ms);
+					Thread.Sleep(interval);
 					ping.m_pingTime = System.Environment.TickCount;
 					m_subServer_udp.SendTo(ping, m_subServerAddr_udp);
 
@@ -143,8 +150,8 @@ namespace NAT_Test
 				}
 			});
 
-			m_thread1.Start(m_udp1);
-			m_thread2.Start(m_udp2);
+			m_thread1.Start(new Tuple<SocketIo, bool, string>(m_udp1, true, "FirstUDP"));
+			m_thread2.Start(new Tuple<SocketIo, bool, string>(m_udp2, false, "SecondUDP"));
 			m_heartbeatThread.Start();
 		}
 

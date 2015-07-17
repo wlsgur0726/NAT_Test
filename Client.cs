@@ -511,7 +511,10 @@ namespace NAT_Test
 							   IPEndPoint a_dest,
 							   out int a_contextID)
 		{
-			a_contextID = Config.Random.Next(int.MaxValue);
+			do {
+				a_contextID = Config.Random.Next(int.MaxValue);
+			} while (a_contextID == 0);
+
 			Message req = new Message();
 			req.m_contextSeq = 1;
 			req.m_contextID = a_contextID;
@@ -520,7 +523,9 @@ namespace NAT_Test
 			timer.Interval = Config.Retransmission_Interval_Ms;
 			timer.Elapsed += new ElapsedEventHandler((object a_sender, ElapsedEventArgs a_eArgs) =>
 			{
-				Config.OnEventDelegate(" request to " + a_dest.ToString() + "... ");
+				Config.OnEventDelegate(
+					" request to " + a_dest.ToString() + 
+					"... (" + req.m_contextID + ":" + req.m_contextSeq + ")");
 				req.m_pingTime = System.Environment.TickCount;
 				a_io.SendTo(req, a_dest);
 			});

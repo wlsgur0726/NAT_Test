@@ -42,16 +42,16 @@ namespace NAT_Test
 					else
 						dst = new IPEndPoint(IPAddress.Parse(msg.m_address), msg.m_port);
 
+					msg.m_address = sender.Address.ToString();
+					msg.m_port = sender.Port;
+					++msg.m_contextSeq;
+
 					if (msg.m_contextID != 0) { // 0은 Heartbeat이므로 출력하지 않는다.
 						Config.OnEventDelegate(
 							"Requested from " + sender.ToString() +
 							", context=(" + msg.m_contextID + ":" + msg.m_contextSeq + ")");
 						Config.OnEventDelegate("Response to " + dst.ToString());
 					}
-
-					msg.m_address = sender.Address.ToString();
-					msg.m_port = sender.Port;
-					++msg.m_contextSeq;
 
 					io.SendTo(msg, dst);
 				}
