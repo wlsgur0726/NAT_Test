@@ -37,25 +37,6 @@ namespace NAT_Test
 			if (a_bindAddr_udp1 == null || a_bindAddr_udp2 == null || a_subServer_udp == null)
 				throw new ArgumentNullException();
 
-			// Address_and_Port_Dependent 여부를 가려내려면 MainServer는 동일한 IP에 서로 다른 두 Port를 사용해야 한다.
-			if (a_bindAddr_udp1.Address.Equals(a_bindAddr_udp2.Address)  == false) {
-				throw new ArgumentException("a_bindAddr_udp1와 a_bindAddr_udp2의 IP가 다릅니다."
-											+ " a_bindAddr_udp1:" + a_bindAddr_udp1.Address.ToString()
-											+ " a_bindAddr_udp2:" + a_bindAddr_udp2.Address.ToString());
-			}
-			if (a_bindAddr_udp1.Port == a_bindAddr_udp2.Port) {
-				throw new ArgumentException("a_bindAddr_udp1와 a_bindAddr_udp2의 Port가 같습니다."
-											+ " a_bindAddr_udp1:" + a_bindAddr_udp1.Port
-											+ " a_bindAddr_udp2:" + a_bindAddr_udp2.Port);
-			}
-
-			// Address_Dependent 여부를 가려내려면 MainServer와 SubServer의 IP가 서로 달라야 한다.
-			if (a_subServer_udp.Address.Equals(a_bindAddr_udp1.Address)) {
-				throw new ArgumentException("mainServer와 subServer의 IP가 같습니다."
-											+ " a_bindAddr_udp:" + a_bindAddr_udp1.Address.ToString()
-											+ " a_subServer_udp:" + a_subServer_udp.Address.ToString());
-			}
-
 			m_subServerAddr_udp = a_subServer_udp;
 
 			m_udp1 = CreateSocketIO(a_bindAddr_udp1, ProtocolType.Udp);
@@ -133,6 +114,9 @@ namespace NAT_Test
 						Config.OnErrorDelegate("SubServer와의 통신이 되지 않고 있습니다.");
 						--timeoutCount;
 					}
+
+					Thread.Sleep(Config.Timeout_Ms);
+					ping.m_pingTime = System.Environment.TickCount;
 					m_subServer_udp.SendTo(ping, m_subServerAddr_udp);
 
 					Message pong;

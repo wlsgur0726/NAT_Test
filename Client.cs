@@ -187,7 +187,7 @@ namespace NAT_Test
 
 			// Step 1. Filtering Behavior Test
 			{
-				Config.OnEventDelegate("Step 1. Filtering Behavior Test");
+				Config.OnEventDelegate("\nStep 1. Filtering Behavior Test");
 				Config.OnEventDelegate("MainServer의 First UDP(" + m_mainServer_udp1.ToString() + ")로 Request");
 				int ctxID;
 				Timer sendWorker = CreateSendWorker(mainIO, m_mainServer_udp1, out ctxID);
@@ -295,7 +295,7 @@ namespace NAT_Test
 
 			// Step 2. Mapping Behavior Test (1)  :  APDM인지 여부를 테스트.
 			if (result.PublicUdpAddress_2 == null) {
-				Config.OnEventDelegate("Step 2. Mapping Behavior Test (1)  :  APDM인지 여부를 테스트.");
+				Config.OnEventDelegate("\nStep 2. Mapping Behavior Test (1)  :  APDM인지 여부를 테스트.");
 
 				Debug.Assert(result.MappingBehavior == TestResult.Behavior.None);
 				Debug.Assert(result.FilteringBehavior == TestResult.Behavior.Address_and_Port_Dependent);
@@ -343,7 +343,7 @@ namespace NAT_Test
 
 			// Step 3. Mapping Behavior Test (2)  :  EIM인지 ADM인지 여부를 테스트.
 			if (result.MappingBehavior == TestResult.Behavior.None) {
-				Config.OnEventDelegate("Step 3. Mapping Behavior Test (2)  :  EIM인지 ADM인지 여부를 테스트.");
+				Config.OnEventDelegate("\nStep 3. Mapping Behavior Test (2)  :  EIM인지 ADM인지 여부를 테스트.");
 
 				Debug.Assert(result.PublicUdpAddress_1.Equals(result.PublicUdpAddress_2));
 				Debug.Assert(result.PublicUdpAddress_3 == null);
@@ -395,7 +395,7 @@ namespace NAT_Test
 
 			// Step 4. Hairpin Test
 			{
-				Config.OnEventDelegate("Step 4. Hairpin Test");
+				Config.OnEventDelegate("\nStep 4. Hairpin Test");
 
 				SocketIo subIO;
 				CreateSocketIO(ProtocolType.Udp, out subIO, out result.PrivateUdpAddress_2);
