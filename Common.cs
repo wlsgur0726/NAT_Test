@@ -11,7 +11,7 @@ namespace NAT_Test
 {
 	public class Config
 	{
-		public delegate void OnError(string a_errorMessage);
+		public delegate void OnEvent(string a_eventMessage);
 
 		public static int Message_Max_Length = 8 * 1024;
 
@@ -23,7 +23,15 @@ namespace NAT_Test
 
 		public static Random Random = new Random();
 
-		public static OnError OnErrorDelegate = (string a_errorMessage) =>
+		public static bool PrintEvent = true;
+
+		public static OnEvent OnEventDelegate = (string a_eventMessage) =>
+		{
+			if (PrintEvent)
+				System.Console.WriteLine(a_eventMessage);
+		};
+
+		public static OnEvent OnErrorDelegate = (string a_errorMessage) =>
 		{
 			System.Console.Error.WriteLine(a_errorMessage);
 		};

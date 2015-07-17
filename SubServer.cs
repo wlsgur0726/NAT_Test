@@ -13,6 +13,7 @@ namespace NAT_Test
 		volatile bool m_run = false;
 
 		Thread m_thread = null;
+		
 
 		public void Start(IPEndPoint a_bindAddr_udp)
 		{
@@ -40,6 +41,11 @@ namespace NAT_Test
 						dst = sender;
 					else
 						dst = new IPEndPoint(IPAddress.Parse(msg.m_address), msg.m_port);
+
+					Config.OnEventDelegate(
+						"Requested from " + sender.ToString() +
+						", context=(" + msg.m_contextID + ":" + msg.m_contextSeq + ")");
+					Config.OnEventDelegate("Response to " + dst.ToString());
 
 					msg.m_address = sender.Address.ToString();
 					msg.m_port = sender.Port;

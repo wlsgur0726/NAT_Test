@@ -64,19 +64,19 @@ namespace NAT_Test
 		public bool Exit_NAT = false;
 
 
-		// 로컬 메인 소켓의 내부주소
+		// First Local UDP Socket의 내부주소
 		public IPEndPoint PrivateUdpAddress_1 = null;
 
 
-		// 로컬 서브 소켓의 내부주소
+		// Second Local UDP Socket의 내부주소
 		public IPEndPoint PrivateUdpAddress_2 = null;
 
 
-		// MainServer의 MainPort와 연결된 외부주소
+		// MainServer의 First UDP와 연결된 외부주소
 		public IPEndPoint PublicUdpAddress_1 = null;
 
 
-		// MainServer의 SubPort와 연결된 외부주소
+		// MainServer의 Second UDP와 연결된 외부주소
 		public IPEndPoint PublicUdpAddress_2 = null;
 
 
@@ -84,11 +84,11 @@ namespace NAT_Test
 		public IPEndPoint PublicUdpAddress_3 = null;
 
 
-		// Hairpin 시 수신자에서 본 송신자 주소 (sub->main)
+		// Hairpin 시 수신자에서 본 송신자 주소 (First UDP의 외부주소)
 		public IPEndPoint PublicUdpAddress_4 = null;
 
 
-		// Hairpin 시 수신자에서 본 송신자 주소 (main->sub)
+		// Hairpin 시 수신자에서 본 송신자 주소 (Second UDP의 외부주소)
 		public IPEndPoint PublicUdpAddress_5 = null;
 
 
@@ -187,36 +187,36 @@ namespace NAT_Test
 
 			// Step 1. Filtering Behavior Test
 			{
+				Config.OnEventDelegate("Step 1. Filtering Behavior Test");
+				Config.OnEventDelegate("MainServer의 First UDP(" + m_mainServer_udp1.ToString() + ")로 Request");
 				int ctxID;
 				Timer sendWorker = CreateSendWorker(mainIO, m_mainServer_udp1, out ctxID);
 
 				int recvTimeout = Config.Timeout_Ms;
 				bool isTimeout = false;
-				while (    isTimeout == false
-					   && 
-						   (   result.PublicUdpAddress_1 == null
-							|| result.PublicUdpAddress_2 == null
-							|| result.PublicUdpAddress_3 == null) )
+				bool addrIsNull = true;
+				do
 				{
-					isTimeout = ! WaitForRecvEvent(
-						ctxID,
-						mainIO, 
-						ref recvTimeout,
+					isTimeout = ! WaitForRecvEvent(ctxID, mainIO, ref recvTimeout,
 						(IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
 						{
+							string addrstr = " (" + a_publicAddress.ToString() + ")";
 							if (a_sender.Equals(m_mainServer_udp1)) {
 								if (result.PublicUdpAddress_1 != null)
 									return false;
+								Config.OnEventDelegate("MainServer의 First UDP로부터 Response 수신 성공" + addrstr);
 								result.PublicUdpAddress_1 = a_publicAddress;
 							}
 							else if (a_sender.Equals(m_mainServer_udp2)) {
 								if (result.PublicUdpAddress_2 != null)
 									return false;
+								Config.OnEventDelegate("MainServer의 Second UDP로부터 Response 수신 성공" + addrstr);
 								result.PublicUdpAddress_2 = a_publicAddress;
 							}
 							else if (a_sender.Equals(m_subServer_udp)) {
 								if (result.PublicUdpAddress_3 != null)
 									return false;
+								Config.OnEventDelegate("SubServer로부터 Response 수신 성공" + addrstr);
 								result.PublicUdpAddress_3 = a_publicAddress;
 							}
 							else {
@@ -227,7 +227,10 @@ namespace NAT_Test
 							return true;
 						}
 					);
-				}
+					addrIsNull = result.PublicUdpAddress_1 == null
+							  || result.PublicUdpAddress_2 == null
+							  || result.PublicUdpAddress_3 == null;
+				} while (isTimeout==false && addrIsNull);
 				sendWorker.Stop();
 
 				if (result.PublicUdpAddress_1 == null) {
@@ -240,6 +243,7 @@ namespace NAT_Test
 						result.Available_Communication = false;
 						result.Comment += " UDP 통신이 불가능합니다.";
 					}
+					Config.OnEventDelegate(result.Comment);
 					return result;
 				}
 
@@ -255,6 +259,7 @@ namespace NAT_Test
 					result.Exit_NAT = false;
 					result.Complete = true;
 					result.Comment = "내부주소와 외부주소가 같습니다. (" + result.PrivateUdpAddress_1.ToString() + ")";
+					Config.OnEventDelegate(result.Comment);
 					return result;
 				}
 
@@ -267,15 +272,18 @@ namespace NAT_Test
 					// MappingBehavior 확정 가능
 					result.MappingBehavior = TestResult.Behavior.Endpoint_Independent;
 					result.FilteringBehavior = TestResult.Behavior.Endpoint_Independent;
+					Config.OnEventDelegate("Full-Cone NAT입니다.");
 				}
 				else if (result.PublicUdpAddress_2 != null) {
 					// result.PublicAddress_3은 수신하지 못했는데 result.PublicAddress_2는 수신한 경우
 					// MappingBehavior는 APDM은 아니지만 EIM인지 ADM인지 불분명
 					result.FilteringBehavior = TestResult.Behavior.Address_Dependent;
+					Config.OnEventDelegate("SubServer에게서만 Response를 받지 못했으므로 ADF입니다.");
 				}
 				else {
 					// result.PublicAddress_1를 제외하고 모두 수신하지 못한 경우
 					// MappingBehavior는 불분명
+					Config.OnEventDelegate("Outbound가 없었던 Port로 부터는 Response를 받지 못했으므로 APDF입니다.");
 					result.FilteringBehavior = TestResult.Behavior.Address_and_Port_Dependent;
 				}
 			}
@@ -285,73 +293,98 @@ namespace NAT_Test
 			Debug.Assert(result.FilteringBehavior != TestResult.Behavior.None);
 
 
-			// Step 2 - Mapping Behavior Test (1)  :  APDM인지 여부를 테스트.
+			// Step 2. Mapping Behavior Test (1)  :  APDM인지 여부를 테스트.
 			if (result.PublicUdpAddress_2 == null) {
+				Config.OnEventDelegate("Step 2. Mapping Behavior Test (1)  :  APDM인지 여부를 테스트.");
+
 				Debug.Assert(result.MappingBehavior == TestResult.Behavior.None);
 				Debug.Assert(result.FilteringBehavior == TestResult.Behavior.Address_and_Port_Dependent);
 
+				Config.OnEventDelegate("MainServer의 Second UDP(" + m_mainServer_udp2.ToString() + ")로 Request");
 				int ctxID;
 				Timer sendWorker = CreateSendWorker(mainIO, m_mainServer_udp2, out ctxID);
 
 				int recvTimeout = Config.Timeout_Ms;
-				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout, (IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
-				{
-					if (a_sender.Equals(m_mainServer_udp2) == false) {
-						Config.OnErrorDelegate("엉뚱한 sender : " + a_sender.ToString());
-						return false;
+				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout, 
+					(IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
+					{
+						if (a_sender.Equals(m_mainServer_udp2) == false) {
+							Config.OnErrorDelegate("엉뚱한 sender : " + a_sender.ToString());
+							return false;
+						}
+						if (result.PublicUdpAddress_2 != null)
+							return false;
+
+						Config.OnEventDelegate(
+							"MainServer의 Second UDP로부터 Response 수신 성공 (" + a_publicAddress.ToString() + ")");
+						result.PublicUdpAddress_2 = a_publicAddress;
+						return true;
 					}
-					result.PublicUdpAddress_2 = a_publicAddress;
-					return true;
-				});
+				);
 				sendWorker.Stop();
 
 				if (result.PublicUdpAddress_2 == null) {
 					result.Complete = false;
 					result.Comment = "Mapping Behavior 테스트 실패. MainServer로부터 Response를 수신하지 못함.";
+					Config.OnEventDelegate(result.Comment);
 					return result;
 				}
 				else {
 					if (result.PublicUdpAddress_2.Equals(result.PublicUdpAddress_1)) {
-						// result.PublicAddress_1과 result.PublicAddress_2가 같으므로 EIM인지 ADM인지 불분명
+						Config.OnEventDelegate("First UDP로부터 받은 주소와 동일하므로 EIM인지 ADM인지 불분명.");
 					}
 					else {
 						result.MappingBehavior = TestResult.Behavior.Address_and_Port_Dependent;
+						Config.OnEventDelegate("First UDP로부터 받은 주소와 다르므로 APDM입니다.");
 					}
 				}
 			}
 
 
-			// Step 3 - Mapping Behavior Test (2)  :  EIM인지 ADM인지 여부를 테스트.
+			// Step 3. Mapping Behavior Test (2)  :  EIM인지 ADM인지 여부를 테스트.
 			if (result.MappingBehavior == TestResult.Behavior.None) {
+				Config.OnEventDelegate("Step 3. Mapping Behavior Test (2)  :  EIM인지 ADM인지 여부를 테스트.");
+
 				Debug.Assert(result.PublicUdpAddress_1.Equals(result.PublicUdpAddress_2));
 				Debug.Assert(result.PublicUdpAddress_3 == null);
 
+				Config.OnEventDelegate("SubServer의 UDP(" + m_subServer_udp.ToString() + ")로 Request");
 				int ctxID;
 				Timer sendWorker = CreateSendWorker(mainIO, m_subServer_udp, out ctxID);
 
 				int recvTimeout = Config.Timeout_Ms;
-				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout, (IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
-				{
-					if (a_sender.Equals(m_subServer_udp) == false) {
-						Config.OnErrorDelegate("엉뚱한 sender : " + a_sender.ToString());
-						return false;
+				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout,
+					(IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
+					{
+						if (a_sender.Equals(m_subServer_udp) == false) {
+							Config.OnErrorDelegate("엉뚱한 sender : " + a_sender.ToString());
+							return false;
+						}
+						if (result.PublicUdpAddress_3 != null)
+							return false;
+
+						Config.OnEventDelegate(
+							"SubServer로부터 Response 수신 성공 (" + a_publicAddress.ToString() + ")");
+						result.PublicUdpAddress_3 = a_publicAddress;
+						return true;
 					}
-					result.PublicUdpAddress_3 = a_publicAddress;
-					return true;
-				});
+				);
 				sendWorker.Stop();
 
 				if (result.PublicUdpAddress_3 == null) {
 					result.Complete = false;
 					result.Comment = "Mapping Behavior 테스트 실패. SubServer로부터 Response를 수신하지 못함.";
+					Config.OnEventDelegate(result.Comment);
 					return result;
 				}
 				else {
 					if (result.PublicUdpAddress_3.Equals(result.PublicUdpAddress_1)) {
 						result.MappingBehavior = TestResult.Behavior.Endpoint_Independent;
+						Config.OnEventDelegate("모든 외부주소가 동일하므로 EIM입니다.");
 					}
 					else {
 						result.MappingBehavior = TestResult.Behavior.Address_Dependent;
+						Config.OnEventDelegate("목적지 주소가 다를 경우에만 외부주소가 동일하므로 ADM입니다.");
 					}
 				}
 			}
@@ -360,59 +393,79 @@ namespace NAT_Test
 			Debug.Assert(result.MappingBehavior != TestResult.Behavior.None);
 
 
-			// Step 4 - Hairpin Test
-			if (result.MappingBehavior != TestResult.Behavior.Endpoint_Independent) {
-				result.SupportedHairpin = TestResult.Hairpin.No;
-			}
-			else {
+			// Step 4. Hairpin Test
+			{
+				Config.OnEventDelegate("Step 4. Hairpin Test");
+
 				SocketIo subIO;
 				CreateSocketIO(ProtocolType.Udp, out subIO, out result.PrivateUdpAddress_2);
 				Debug.Assert(result.PrivateUdpAddress_1.Equals(result.PrivateUdpAddress_2) == false);
 
+				// Second -> First
+				Config.OnEventDelegate(
+					"Second UDP(" + result.PrivateUdpAddress_2.ToString() + ")를 만들어서 " +
+					"First UDP의 외부주소(" + result.PublicUdpAddress_1.ToString() + ")로 Request");
 				int ctxID;
-				// Sub -> Main
 				Timer sendWorker = CreateSendWorker(subIO, result.PublicUdpAddress_1, out ctxID);
 
 				int recvTimeout = Config.Timeout_Ms;
-				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout, (IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
-				{
-					result.PublicUdpAddress_4 = a_sender;
-					return true;
-				});
-				sendWorker.Stop();
-
-				if (result.PublicUdpAddress_4 == null) {
-					result.SupportedHairpin = TestResult.Hairpin.No;
-					result.Comment = "hairpin message를 수신받지 못함 (Sub->Main)";
-				}
-				else {
-					// Main -> Sub
-					sendWorker = CreateSendWorker(mainIO, result.PublicUdpAddress_4, out ctxID);
-
-					recvTimeout = Config.Timeout_Ms;
-					WaitForRecvEvent(ctxID, subIO, ref recvTimeout, (IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
+				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout,
+					(IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
 					{
+						if (result.PublicUdpAddress_5 != null)
+							return false;
+
+						Config.OnEventDelegate(a_sender.ToString() + "로부터 Request 수신");
 						result.PublicUdpAddress_5 = a_sender;
 						return true;
-					});
+					}
+				);
+				sendWorker.Stop();
+
+				if (result.PublicUdpAddress_5 == null) {
+					result.SupportedHairpin = TestResult.Hairpin.No;
+					result.Comment = "hairpin message를 수신받지 못함 (Second->First)";
+					Config.OnEventDelegate(result.Comment);
+				}
+				else {
+					// First -> Second
+					Config.OnEventDelegate(
+						"First UDP(" + result.PrivateUdpAddress_1.ToString() + ")에서 " +
+						"Second UDP(" + result.PublicUdpAddress_5.ToString() + ")에게 Request");
+					sendWorker = CreateSendWorker(mainIO, result.PublicUdpAddress_5, out ctxID);
+
+					recvTimeout = Config.Timeout_Ms;
+					WaitForRecvEvent(ctxID, subIO, ref recvTimeout,
+						(IPEndPoint a_sender, IPEndPoint a_publicAddress) =>
+						{
+							if (result.PublicUdpAddress_4 != null)
+								return false;
+
+							Config.OnEventDelegate(a_sender.ToString() + "로부터 Request 수신");
+							result.PublicUdpAddress_4 = a_sender;
+							return true;
+						}
+					);
 					sendWorker.Stop();
 
 					if (result.PublicUdpAddress_5 == null) {
-						// Main에서 Sub로 회신이 불가능
+						// First에서 Second로 회신이 불가능
 						result.SupportedHairpin = TestResult.Hairpin.No;
-						result.Comment = "hairpin message를 수신받지 못함 (Main->Sub)";
+						result.Comment = "hairpin message를 수신받지 못함 (First->Second)";
+						Config.OnEventDelegate(result.Comment);
 					}
 					else {
-						bool sub2main = result.PublicUdpAddress_4.Equals(result.PrivateUdpAddress_2);
-						bool main2sub = result.PublicUdpAddress_5.Equals(result.PrivateUdpAddress_1);
-						if (sub2main || main2sub) {
+						bool isPrivate1 = result.PublicUdpAddress_4.Equals(result.PrivateUdpAddress_1);
+						bool isPrivate2 = result.PublicUdpAddress_5.Equals(result.PrivateUdpAddress_2);
+						if (isPrivate1 || isPrivate2) {
 							// 송신자 주소가 내부주소인 경우
 							result.SupportedHairpin = TestResult.Hairpin.Available_Communication;
-							result.Comment = "src address가 private address입니다";
-							if (sub2main)
-								result.Comment += ", (Sub->Main " + result.PublicUdpAddress_4.ToString() + ")";
-							if (main2sub)
-								result.Comment += ", (Main->Sub " + result.PublicUdpAddress_5.ToString() + ")";
+							result.Comment = "수신측에서 본 src address가 private address입니다";
+							if (isPrivate1)
+								result.Comment += ", (First " + result.PublicUdpAddress_4.ToString() + ")";
+							if (isPrivate2)
+								result.Comment += ", (Second " + result.PublicUdpAddress_5.ToString() + ")";
+							Config.OnEventDelegate(result.Comment);
 						}
 						else {
 							// 송신자 주소가 다른 주소로(아마도 외부주소)로 매핑된 경우
@@ -428,7 +481,9 @@ namespace NAT_Test
 
 
 
-		void CreateSocketIO(ProtocolType a_protocol, out SocketIo a_io, out IPEndPoint a_privateAddress)
+		void CreateSocketIO(ProtocolType a_protocol,
+							out SocketIo a_io,
+							out IPEndPoint a_privateAddress)
 		{
 			SocketType sockType = SocketType.Unknown;
 			if (a_protocol == ProtocolType.Tcp)
@@ -452,7 +507,9 @@ namespace NAT_Test
 
 
 
-		Timer CreateSendWorker(SocketIo a_io, IPEndPoint a_dest, out int a_contextID)
+		Timer CreateSendWorker(SocketIo a_io, 
+							   IPEndPoint a_dest,
+							   out int a_contextID)
 		{
 			a_contextID = Config.Random.Next(int.MaxValue);
 			Message req = new Message();
@@ -463,6 +520,8 @@ namespace NAT_Test
 			timer.Interval = Config.Retransmission_Interval_Ms;
 			timer.Elapsed += new ElapsedEventHandler((object a_sender, ElapsedEventArgs a_eArgs) =>
 			{
+				Config.OnEventDelegate(" request to " + a_dest.ToString() + "... ");
+				req.m_pingTime = System.Environment.TickCount;
 				a_io.SendTo(req, a_dest);
 			});
 			timer.Start();
@@ -471,7 +530,8 @@ namespace NAT_Test
 
 
 
-		delegate bool OnResponse(IPEndPoint a_sender, IPEndPoint a_publicAddress);
+		delegate bool OnResponse(IPEndPoint a_sender, 
+								 IPEndPoint a_publicAddress);
 
 		bool WaitForRecvEvent(int a_contextID,
 							  SocketIo a_io, 

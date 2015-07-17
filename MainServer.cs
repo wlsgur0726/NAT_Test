@@ -15,7 +15,7 @@ namespace NAT_Test
 
 		SocketIo m_udp2 = null;
 
-		SocketIo m_subUdp = null;
+		SocketIo m_subServer_udp = null;
 
 		IPEndPoint m_subServerAddr_udp = null;
 
@@ -26,6 +26,8 @@ namespace NAT_Test
 		Thread m_thread2 = null;
 
 		Thread m_heartbeatThread = null;
+
+
 
 		public MainServer(IPEndPoint a_bindAddr_udp1,
 						  IPEndPoint a_bindAddr_udp2,
@@ -58,8 +60,9 @@ namespace NAT_Test
 
 			m_udp1 = CreateSocketIO(a_bindAddr_udp1, ProtocolType.Udp);
 			m_udp2 = CreateSocketIO(a_bindAddr_udp2, ProtocolType.Udp);
-			m_subUdp = CreateSocketIO(new IPEndPoint(IPAddress.Any, 0), ProtocolType.Udp);
+			m_subServer_udp = CreateSocketIO(new IPEndPoint(IPAddress.Any, 0), ProtocolType.Udp);
 		}
+
 
 
 		SocketIo CreateSocketIO(IPEndPoint a_bindAddr, ProtocolType a_protocol)
@@ -79,17 +82,20 @@ namespace NAT_Test
 			return new SocketIo(sock);
 		}
 
+
 		
 		public void Start()
 		{
 			m_udp1.Start();
 			m_udp2.Start();
-			m_subUdp.Start();
+			m_subServer_udp.Start();
 
 			m_run = true;
 			ParameterizedThreadStart threadRoutine = (object a_data) =>
 			{
 				SocketIo io = (SocketIo)a_data;
+				bool isFirstUdp = io.Equals(m_udp1);
+				string name = isFirstUdp ? "FirstUDP" : "SecondUDP";
 
 				while (m_run) {
 					Message msg;
@@ -97,12 +103,17 @@ namespace NAT_Test
 					if (io.WaitForRecv(Config.Timeout_Ms, out msg, out sender) == false)
 						continue;
 
+					Config.OnEventDelegate(
+						"[" + name + "] Requested from " + sender.ToString() + 
+						", context=(" + msg.m_contextID + ":" + msg.m_contextSeq + ")");
+
 					++msg.m_contextSeq;
 					msg.m_address = sender.Address.ToString();
 					msg.m_port = sender.Port;
 
 					io.SendTo(msg, sender);
-					m_subUdp.SendTo(msg, sender);
+					if (isFirstUdp)
+						m_subServer_udp.SendTo(msg, sender);
 				}
 			};
 
@@ -122,11 +133,11 @@ namespace NAT_Test
 						Config.OnErrorDelegate("SubServer와의 통신이 되지 않고 있습니다.");
 						--timeoutCount;
 					}
-					m_subUdp.SendTo(ping, m_subServerAddr_udp);
+					m_subServer_udp.SendTo(ping, m_subServerAddr_udp);
 
 					Message pong;
 					IPEndPoint sender;
-					if (m_subUdp.WaitForRecv(Config.Timeout_Ms, out pong, out sender) == false) {
+					if (m_subServer_udp.WaitForRecv(Config.Timeout_Ms, out pong, out sender) == false) {
 						++timeoutCount;
 						continue;
 					}
@@ -152,6 +163,7 @@ namespace NAT_Test
 			m_thread2.Start(m_udp2);
 			m_heartbeatThread.Start();
 		}
+
 
 
 		public void Stop()
