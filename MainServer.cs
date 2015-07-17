@@ -71,18 +71,12 @@ namespace NAT_Test
 			m_udp2.Start();
 			m_subServer_udp.Start();
 
-			m_run = true;
-			ParameterizedThreadStart threadRoutine = (object a_data) =>
+			m_thread1 = new Thread((object a_data) =>
 			{
-				var param = (Tuple<SocketIo, bool, string>)(a_data);
-				SocketIo io = param.Item1;
-				bool isFirstUdp = param.Item2;
-				string name = param.Item3;
-
 				while (m_run) {
 					Message msg;
 					IPEndPoint sender;
-					if (io.WaitForRecv(Config.Timeout_Ms, out msg, out sender) == false)
+					if (m_udp1.WaitForRecv(Config.Timeout_Ms, out msg, out sender) == false)
 						continue;
 
 					++msg.m_contextSeq;
@@ -90,19 +84,35 @@ namespace NAT_Test
 					msg.m_port = sender.Port;
 
 					string ctxstr = " " + Message.ContextString(msg.m_contextID, msg.m_contextSeq);
-					Config.OnEventDelegate("[" + name + "] Requested from " + sender.ToString() + ctxstr);
-					Config.OnEventDelegate("[" + name + "] Response to " + sender.ToString() + ctxstr);
-					
-					io.SendTo(msg, sender);
-					if (isFirstUdp) {
-						Config.OnEventDelegate("[" + name + "] Pass to " + m_subServerAddr_udp.ToString() + ctxstr);
-						m_subServer_udp.SendTo(msg, m_subServerAddr_udp);
-					}
+					Config.OnEventDelegate("[UDP1] Requested from " + sender.ToString() + ctxstr);
+					Config.OnEventDelegate("[UDP2] Response to " + sender.ToString() + ctxstr);
+					m_udp2.SendTo(msg, sender);
+					Config.OnEventDelegate("[UDP1] Response to " + sender.ToString() + ctxstr);
+					m_udp1.SendTo(msg, sender);
+					Config.OnEventDelegate("[UDP1] Pass to " + m_subServerAddr_udp.ToString() + ctxstr);
+					m_subServer_udp.SendTo(msg, m_subServerAddr_udp);
 				}
-			};
+			});
 
-			m_thread1 = new Thread(threadRoutine);
-			m_thread2 = new Thread(threadRoutine);
+			m_thread2 = new Thread((object a_data) =>
+			{
+				while (m_run) {
+					Message msg;
+					IPEndPoint sender;
+					if (m_udp2.WaitForRecv(Config.Timeout_Ms, out msg, out sender) == false)
+						continue;
+
+					++msg.m_contextSeq;
+					msg.m_address = sender.Address.ToString();
+					msg.m_port = sender.Port;
+
+					string ctxstr = " " + Message.ContextString(msg.m_contextID, msg.m_contextSeq);
+					Config.OnEventDelegate("[UDP2] Requested from " + sender.ToString() + ctxstr);
+					Config.OnEventDelegate("[UDP2] Response to " + sender.ToString() + ctxstr);
+					m_udp2.SendTo(msg, sender);
+				}
+			});
+
 			m_heartbeatThread = new Thread((object a_data) =>
 			{
 				int timeoutCount = 0;
@@ -152,8 +162,9 @@ namespace NAT_Test
 				}
 			});
 
-			m_thread1.Start(new Tuple<SocketIo, bool, string>(m_udp1, true, "FirstUDP"));
-			m_thread2.Start(new Tuple<SocketIo, bool, string>(m_udp2, false, "SecondUDP"));
+			m_run = true;
+			m_thread1.Start();
+			m_thread2.Start();
 			m_heartbeatThread.Start();
 		}
 

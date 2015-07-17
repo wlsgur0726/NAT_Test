@@ -337,7 +337,7 @@ namespace NAT_Test
 				}
 				else {
 					if (result.PublicUdpAddress_2.Equals(result.PublicUdpAddress_1)) {
-						Config.OnEventDelegate("First UDP로부터 받은 주소와 동일하므로 EIM인지 ADM인지 불분명.");
+						Config.OnEventDelegate("First UDP로부터 받은 주소와 동일하므로 APDM은 아님.");
 					}
 					else {
 						result.MappingBehavior = TestResult.Behavior.Address_and_Port_Dependent;
