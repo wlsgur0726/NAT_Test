@@ -35,17 +35,10 @@ namespace NAT_Test
 	{
 		public int m_contextID = -1;
 		public int m_contextSeq = -1;
-		public int m_tick = Environment.TickCount;
-		public string m_type = "";
+		public int m_pingTime = -1;
 		public string m_address = "";
 		public int m_port = -1;
 		public string m_otherMessage = "";
-
-		public bool IsValid()
-		{
-			return m_contextSeq > 0
-				&& m_type != "";
-		}
 
 		public bool AddressIsEmpty()
 		{
@@ -95,19 +88,14 @@ namespace NAT_Test
 					}
 					else {
 						string jsonMsg = Encoding.UTF8.GetString(a_evCtx.Buffer, 2, len);
-						Message msg = JsonConvert.DeserializeObject<Message>(jsonMsg);
-						if (msg.IsValid() == false) {
-							Config.OnErrorDelegate("invalid message : " + jsonMsg);
+						Message msg = JsonConvert.DeserializeObject<Message>(jsonMsg);						
+						lock (m_recvedMessageQueue) {
+							m_recvedMessageQueue.Enqueue(new RecvedMessage {
+								m_sender = (IPEndPoint)a_evCtx.RemoteEndPoint,
+								m_message = msg
+							});
 						}
-						else {
-							lock (m_recvedMessageQueue) {
-								m_recvedMessageQueue.Enqueue(new RecvedMessage {
-									m_sender = (IPEndPoint)a_evCtx.RemoteEndPoint,
-									m_message = msg
-								});
-							}
-							m_recvedEvent.Release();
-						}
+						m_recvedEvent.Release();
 					}
 
 					m_recvArgs.SetBuffer(0, recvBuf.Length);
@@ -141,6 +129,9 @@ namespace NAT_Test
 
 		public void SendTo(Message a_message, IPEndPoint a_dest)
 		{
+			if (a_message.m_pingTime == -1)
+				a_message.m_pingTime = System.Environment.TickCount;
+
 			string jsonMessage = JsonConvert.SerializeObject(a_message, Config.JsonFormatting);
 			byte[] data = Encoding.UTF8.GetBytes(jsonMessage);
 			byte[] len = BitConverter.GetBytes((Int16)data.Length);

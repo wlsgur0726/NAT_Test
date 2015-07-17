@@ -113,7 +113,8 @@ namespace NAT_Test
 				int timeoutCount = 0;
 
 				Message ping = new Message();
-				int pingPongCtx = Config.Random.Next(int.MaxValue);
+				int pingPongCtx = 0;
+				ping.m_contextSeq = 1;
 				ping.m_contextID = pingPongCtx;
 
 				while (m_run) {
