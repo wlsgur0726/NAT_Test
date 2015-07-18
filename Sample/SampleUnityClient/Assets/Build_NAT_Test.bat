@@ -9,4 +9,4 @@ if "%Config%"=="" set Config=Debug
 cd %~dp0\..\..\..
 MSBuild.exe NAT_Test_3.5_Unity.csproj /t:rebuild /p:Configuration=%Config%
 
-xcopy /C /Y bin\%Config%\*.dll Sample\SampleUnityClient\Assets\
+xcopy /C /Y bin\%Config%\*.dll Sample\SampleUnityClient\Assets\NAT_Test\
