@@ -24,11 +24,17 @@ public class TestSystem
 	}
 
 
-	public static void PrintLine(string a_msg)
+	public static void Print(string a_msg)
 	{
 		lock (OutputStrings) {
 			OutputStrings.Enqueue(a_msg);
 		}
+	}
+
+
+	public static void PrintLine(string a_msg = "\n")
+	{
+		Print(a_msg + "\n");
 	}
 
 
