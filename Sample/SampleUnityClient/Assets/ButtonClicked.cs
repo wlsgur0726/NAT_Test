@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
-using System.Collections;
 using UnityEngine.EventSystems;
+using System.Collections;
 using System.Collections.Generic;
 
 public class ButtonClicked : MonoBehaviour 
@@ -16,14 +16,6 @@ public class ButtonClicked : MonoBehaviour
 		m_output.text = "> ";
 		m_input.Select();
 		//m_output.enabled = false;
-	}
-	
-	void Update () 
-	{
-		string str;
-		while (TestSystem.TryGetOutputString(out str)) {
-			m_input.text += str + "\n> ";
-		}
 	}
 	
 	public void OnEnterClicked()
@@ -41,5 +33,12 @@ public class ButtonClicked : MonoBehaviour
 		m_output.text = "> ";
 		m_output.MoveTextEnd(false);
 	}
-	
+
+	void Update()
+	{
+		string str;
+		while (TestSystem.TryGetOutputString(out str)) {
+			m_output.text += str + "\n> ";
+		}
+	}
 }

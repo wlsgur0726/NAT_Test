@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using UnityEngine;
 
-public class TestSystem : MonoBehaviour
+public class TestSystem
 {
 	static Semaphore InputEvent = new Semaphore(0, int.MaxValue);
 	static Queue<string> InputStrings = new Queue<string>();
@@ -16,7 +16,7 @@ public class TestSystem : MonoBehaviour
 		a_str = null;
 		bool exist;
 		lock (OutputStrings) {
-			exist = OutputStrings.Count > 1;
+			exist = OutputStrings.Count > 0;
 			if (exist)
 				a_str = OutputStrings.Dequeue();
 		}
@@ -48,14 +48,5 @@ public class TestSystem : MonoBehaviour
 		lock (InputStrings) {
 			return InputStrings.Dequeue();
 		}
-	}
-
-	
-	void Start()
-	{
-	}
-
-	void Update()
-	{
 	}
 }

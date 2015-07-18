@@ -3,18 +3,18 @@ using System.Collections;
 using System.Threading;
 using System;
 
-public class main : MonoBehaviour 
+public class Main : MonoBehaviour
 {
-	Thread m_mainThread = null;
 	bool m_terminate = false;
+	Thread m_mainThread = null;
 
-	void Start ()
+	void Start () 
 	{
 		m_mainThread = new Thread((object p) =>
 		{
 			try {
-				TestSystem.PrintLine("Start MainThread");	
-				Main();
+				TestSystem.PrintLine("Start MainThread");
+				TestMain();
 			}
 			catch (Exception e) {
 				TestSystem.PrintLine(e.ToString());
@@ -25,6 +25,7 @@ public class main : MonoBehaviour
 		});
 		m_mainThread.Start();
 	}
+	
 
 	void Update () 
 	{
@@ -34,8 +35,9 @@ public class main : MonoBehaviour
 				m_mainThread = null;
 		}
 	}
+	
 
-	void Main()
+	void TestMain()
 	{
 		TestSystem.PrintLine("Hello World");
 		TestSystem.PrintLine("Wait For Input...");
