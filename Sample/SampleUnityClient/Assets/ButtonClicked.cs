@@ -39,5 +39,10 @@ public class ButtonClicked : MonoBehaviour
 		while (TestSystem.TryGetOutputString(out str)) {
 			m_output.text += str;
 		}
+
+		if (Input.GetKey(KeyCode.Escape)) {
+			Application.Quit();
+			return;
+		}
 	}
 }

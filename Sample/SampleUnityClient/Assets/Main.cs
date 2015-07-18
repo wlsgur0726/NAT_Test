@@ -41,7 +41,7 @@ public class Main : MonoBehaviour
 
 	static void TestMain()
 	{
-#if true
+#if false
 		string ip1 = "1.1.1.1";	
 		string port1 = "1111";
 
