@@ -206,21 +206,21 @@ namespace NAT_Test
 								if (result.PublicUdpAddress_1 != null)
 									return false;
 								Config.OnEventDelegate(
-									"MainServer의 First UDP로부터 Response" + addrstr + " 수신 성공 " + ctxstr);
+									"MainServer의 First UDP로부터 Response" + addrstr + " 수신 성공. " + ctxstr);
 								result.PublicUdpAddress_1 = a_publicAddress;
 							}
 							else if (a_sender.Equals(m_mainServer_udp2)) {
 								if (result.PublicUdpAddress_2 != null)
 									return false;
 								Config.OnEventDelegate(
-									"MainServer의 Second UDP로부터 Response" + addrstr + " 수신 성공" + ctxstr);
+									"MainServer의 Second UDP로부터 Response" + addrstr + " 수신 성공. " + ctxstr);
 								result.PublicUdpAddress_2 = a_publicAddress;
 							}
 							else if (a_sender.Equals(m_subServer_udp)) {
 								if (result.PublicUdpAddress_3 != null)
 									return false;
 								Config.OnEventDelegate(
-									"SubServer로부터 Response" + addrstr + " 수신 성공" + ctxstr);
+									"SubServer로부터 Response" + addrstr + " 수신 성공. " + ctxstr);
 								result.PublicUdpAddress_3 = a_publicAddress;
 							}
 							else {
@@ -322,7 +322,7 @@ namespace NAT_Test
 							return false;
 
 						Config.OnEventDelegate(
-							"MainServer의 Second UDP로부터 Response" + addrstr + " 수신 성공" + ctxstr);
+							"MainServer의 Second UDP로부터 Response" + addrstr + " 수신 성공. " + ctxstr);
 						result.PublicUdpAddress_2 = a_publicAddress;
 						return true;
 					}
@@ -411,8 +411,8 @@ namespace NAT_Test
 
 				// Second -> First
 				Config.OnEventDelegate(
-					"Second UDP(" + result.PrivateUdpAddress_2.ToString() + ")를 만들어서 " +
-					"First UDP의 외부주소(" + result.PublicUdpAddress_1.ToString() + ")로 Request");
+					"Local Second UDP(" + result.PrivateUdpAddress_2.ToString() + ")를 만들어서 " +
+					"Local First UDP의 외부주소(" + result.PublicUdpAddress_1.ToString() + ")로 Request");
 				int ctxID;
 				Timer sendWorker = CreateSendWorker(subIO, result.PublicUdpAddress_1, out ctxID);
 
@@ -439,8 +439,8 @@ namespace NAT_Test
 				else {
 					// First -> Second
 					Config.OnEventDelegate(
-						"First UDP(" + result.PrivateUdpAddress_1.ToString() + ")에서 " +
-						"Second UDP(" + result.PublicUdpAddress_5.ToString() + ")에게 Request");
+						"Local First UDP(" + result.PrivateUdpAddress_1.ToString() + ")에서 " +
+						"Local Second UDP(" + result.PublicUdpAddress_5.ToString() + ")에게 Request");
 					sendWorker = CreateSendWorker(mainIO, result.PublicUdpAddress_5, out ctxID);
 
 					recvTimeout = Config.Timeout_Ms;

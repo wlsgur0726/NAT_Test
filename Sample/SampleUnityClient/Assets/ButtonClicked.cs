@@ -2,46 +2,44 @@
 using UnityEngine.UI;
 using System.Collections;
 using UnityEngine.EventSystems;
-using NAT_Test;
+using System.Collections.Generic;
 
 public class ButtonClicked : MonoBehaviour 
 {
-	InputField StdIn = null;
-	InputField StdOut = null;
-
-	// Use this for initialization
+	InputField m_input = null;
+	InputField m_output = null;
+	
 	void Start()
 	{
-		StdIn = GameObject.Find("StdIn").GetComponent<InputField>();
-		StdOut = GameObject.Find("StdOut").GetComponent<InputField>();
-		StdOut.text = "> ";
-		StdIn.Select();
-		//StdOut.enabled = false;
-
-		Client client = new Client(null, null, null);
-		client.StartTest();
+		m_input = GameObject.Find("StdIn").GetComponent<InputField>();
+		m_output = GameObject.Find("StdOut").GetComponent<InputField>();
+		m_output.text = "> ";
+		m_input.Select();
+		//m_output.enabled = false;
 	}
 	
-	// Update is called once per frame
-	void Update () {
+	void Update () 
+	{
+		string str;
+		while (TestSystem.TryGetOutputString(out str)) {
+			m_input.text += str + "\n> ";
+		}
 	}
-
+	
 	public void OnEnterClicked()
 	{
-		string newCommand = StdIn.text;
-		StdIn.text = "";
-		StdOut.text += newCommand + "\n> ";
-		StdOut.MoveTextEnd(false);
-		StdIn.MoveTextStart(false);
-		StdIn.Select();
-		Debug.Log("OnEnterClicked : " + newCommand);
+		string newCommand = m_input.text;
+		TestSystem.EnqueueInputString(newCommand);
+
+		m_input.text = "";
+		m_input.MoveTextStart(false);
+		m_input.Select();
 	}
 
 	public void OnClearClicked()
 	{
-		StdOut.text = "> ";
-		StdOut.MoveTextEnd(false);
-		Debug.Log("OnClearClicked");
+		m_output.text = "> ";
+		m_output.MoveTextEnd(false);
 	}
 	
 }
