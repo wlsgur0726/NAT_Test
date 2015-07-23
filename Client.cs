@@ -58,7 +58,7 @@ namespace NAT_Test
 		// 이 값이 false라면 이하 다른 변수들은 의미없다.
 		public bool Available_Communication = true;
 
-		
+
 		// 서버와 클라 사이에 NAT가 존재하는지 여부.
 		// 이 값이 false라면 이하 다른 변수들은 의미없다.
 		public bool Exit_NAT = false;
@@ -185,6 +185,7 @@ namespace NAT_Test
 			SocketIo mainIO;
 			CreateSocketIO(ProtocolType.Udp, out mainIO, out result.PrivateUdpAddress_1);
 
+
 			// Step 1. Filtering Behavior Test
 			{
 				Config.OnEventDelegate("\nStep 1. Filtering Behavior Test");
@@ -251,19 +252,23 @@ namespace NAT_Test
 					return result;
 				}
 
-				if (result.PublicUdpAddress_1.Equals(result.PrivateUdpAddress_1)) {
+				if (IsLocalAddress(result.PrivateUdpAddress_1, result.PublicUdpAddress_1)) {
 					// 내부주소와 외부주소가 같은 경우
+					string comment = "내부주소와 외부주소가 같습니다. (" + result.PrivateUdpAddress_1.ToString() + ")";
+					Config.OnEventDelegate(comment);
+					
 					if (result.PublicUdpAddress_2 == null) {
-						Config.OnErrorDelegate("NAT가 없는 상황에서 PublicAddress_2를 수신하지 못함.");
+						Config.OnErrorDelegate("NAT가 없는 상황인데 MainServer의 Second UDP로부터 응답을 받지 못함.");
 					}
 					if (result.PublicUdpAddress_3 == null) {
-						Config.OnErrorDelegate("NAT가 없는 상황에서 PublicAddress_3을 수신하지 못함.");
+						Config.OnErrorDelegate(
+							"NAT가 없는 상황인데 SubServer로부터 응답을 받지 못함. " +
+							"Client측 방화벽의 UDP Inbound 설정을 확인바랍니다.");
 					}
-
+					
 					result.Exit_NAT = false;
 					result.Complete = true;
-					result.Comment = "내부주소와 외부주소가 같습니다. (" + result.PrivateUdpAddress_1.ToString() + ")";
-					Config.OnEventDelegate(result.Comment);
+					result.Comment = comment;
 					return result;
 				}
 
@@ -271,10 +276,14 @@ namespace NAT_Test
 				if (result.PublicUdpAddress_3 != null) {
 					// IP와 Port가 아예 다른 SubServer로부터 메시지를 수신한 경우
 					if (result.PublicUdpAddress_2 == null) {
-						Config.OnErrorDelegate("Full-Cone NAT 상황에서 PublicAddress_2를 수신하지 못함.");
+						Config.OnErrorDelegate(
+							"SubServer로부터는 응답을 받았으나 MainSever의 Second UDP로부터 응답을 받지 못함. " +
+							"Client와 SubServer가 같은 호스트에서 실행된건 아닌지 확인 바랍니다.");
 					}
-					// MappingBehavior 확정 가능
-					result.MappingBehavior = TestResult.Behavior.Endpoint_Independent;
+					else {
+						// MappingBehavior 확정 가능
+						result.MappingBehavior = TestResult.Behavior.Endpoint_Independent;
+					}
 					result.FilteringBehavior = TestResult.Behavior.Endpoint_Independent;
 					Config.OnEventDelegate("Full-Cone NAT입니다.");
 				}
@@ -293,17 +302,13 @@ namespace NAT_Test
 			}
 
 
-			Debug.Assert(result.Exit_NAT == true);
+			Debug.Assert(result.Exit_NAT);
 			Debug.Assert(result.FilteringBehavior != TestResult.Behavior.None);
 
 
 			// Step 2. Mapping Behavior Test (1)  :  APDM인지 여부를 테스트.
 			if (result.PublicUdpAddress_2 == null) {
 				Config.OnEventDelegate("\nStep 2. Mapping Behavior Test (1)  :  APDM인지 여부를 테스트.");
-
-				Debug.Assert(result.MappingBehavior == TestResult.Behavior.None);
-				Debug.Assert(result.FilteringBehavior == TestResult.Behavior.Address_and_Port_Dependent);
-
 				Config.OnEventDelegate("MainServer의 Second UDP(" + m_mainServer_udp2.ToString() + ")로 Request");
 				int ctxID;
 				Timer sendWorker = CreateSendWorker(mainIO, m_mainServer_udp2, out ctxID);
@@ -420,6 +425,7 @@ namespace NAT_Test
 				WaitForRecvEvent(ctxID, mainIO, ref recvTimeout,
 					(IPEndPoint a_sender, IPEndPoint a_publicAddress, int a_contextID, int a_contextSeq) =>
 					{
+						Debug.Assert(a_publicAddress == null);
 						string ctxstr = Message.ContextString(a_contextID, a_contextSeq);
 						if (result.PublicUdpAddress_5 != null)
 							return false;
@@ -447,6 +453,7 @@ namespace NAT_Test
 					WaitForRecvEvent(ctxID, subIO, ref recvTimeout,
 						(IPEndPoint a_sender, IPEndPoint a_publicAddress, int a_contextID, int a_contextSeq) =>
 						{
+							Debug.Assert(a_publicAddress == null);
 							string ctxstr = Message.ContextString(a_contextID, a_contextSeq);
 							if (result.PublicUdpAddress_4 != null)
 								return false;
@@ -465,8 +472,8 @@ namespace NAT_Test
 						Config.OnEventDelegate(result.Comment);
 					}
 					else {
-						bool isPrivate1 = result.PublicUdpAddress_4.Equals(result.PrivateUdpAddress_1);
-						bool isPrivate2 = result.PublicUdpAddress_5.Equals(result.PrivateUdpAddress_2);
+						bool isPrivate1 = IsLocalAddress(result.PrivateUdpAddress_1, result.PublicUdpAddress_4);
+						bool isPrivate2 = IsLocalAddress(result.PrivateUdpAddress_2, result.PublicUdpAddress_5);
 						if (isPrivate1 || isPrivate2) {
 							// 송신자 주소가 내부주소인 경우
 							result.SupportedHairpin = TestResult.Hairpin.Available_Communication;
@@ -491,9 +498,9 @@ namespace NAT_Test
 
 
 
-		void CreateSocketIO(ProtocolType a_protocol,
-							out SocketIo a_io,
-							out IPEndPoint a_privateAddress)
+		static void CreateSocketIO(ProtocolType a_protocol,
+								   out SocketIo a_io,
+								   out IPEndPoint a_privateAddress)
 		{
 			SocketType sockType = SocketType.Unknown;
 			if (a_protocol == ProtocolType.Tcp)
@@ -509,6 +516,7 @@ namespace NAT_Test
 			Socket sock = new Socket(AddressFamily.InterNetwork,
 									 sockType,
 									 a_protocol);
+
 			sock.Bind(new IPEndPoint(IPAddress.Any, 0));
 			a_privateAddress = (IPEndPoint)sock.LocalEndPoint;
 			a_io = new SocketIo(sock);
@@ -517,9 +525,31 @@ namespace NAT_Test
 
 
 
-		Timer CreateSendWorker(SocketIo a_io, 
-							   IPEndPoint a_dest,
-							   out int a_contextID)
+		static bool IsLocalAddress(IPEndPoint a_localAddr, IPEndPoint a_cmpAddr)
+		{
+			if (a_localAddr.Equals(a_cmpAddr))
+				return true;
+
+			if (a_localAddr.Port != a_cmpAddr.Port)
+				return false;
+
+			if (a_localAddr.Address.Equals(IPAddress.Any)) {
+				IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
+				foreach (IPAddress addr in host.AddressList) {
+					if (addr.AddressFamily == AddressFamily.InterNetwork) {
+						if (addr.Equals(a_cmpAddr.Address))
+							return true;
+					}
+				}
+			}
+			return false;
+		}
+
+
+
+		static Timer CreateSendWorker(SocketIo a_io,
+									  IPEndPoint a_dest,
+									  out int a_contextID)
 		{
 			do {
 				a_contextID = Config.Random.Next(int.MaxValue);
@@ -550,26 +580,29 @@ namespace NAT_Test
 								 int a_contextID,
 								 int a_contexSeq);
 
-		bool WaitForRecvEvent(int a_contextID,
-							  SocketIo a_io, 
-							  ref int a_timeoutMs,
-							  OnResponse a_callback)
+		static bool WaitForRecvEvent(int a_contextID,
+									 SocketIo a_io, 
+									 ref int a_timeoutMs,
+									 OnResponse a_callback)
 		{
 			Message res;
 			IPEndPoint sender;
 			
-			Stopwatch stopwatch = new Stopwatch();
-			stopwatch.Start();
 			bool loop = true;
 			while (loop) {
+				Stopwatch stopwatch = new Stopwatch();
+				stopwatch.Start();
 				bool isTimeout = ! a_io.WaitForRecv(a_timeoutMs,
 													out res,
 													out sender);
 				if (isTimeout)
 					return false;
 
-				IPEndPoint publicAddress = new IPEndPoint(IPAddress.Parse(res.m_address),
-														  res.m_port);
+				IPEndPoint publicAddress = null;
+				if (res.AddressIsEmpty() == false) {
+					publicAddress = new IPEndPoint(IPAddress.Parse(res.m_address),
+																   res.m_port);
+				}
 
 				bool valid = res.m_contextID == a_contextID;
 				if (valid) {

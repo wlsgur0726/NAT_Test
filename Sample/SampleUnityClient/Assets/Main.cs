@@ -42,36 +42,31 @@ public class Main : MonoBehaviour
 	static void TestMain()
 	{
 #if false
-		string ip1 = "1.1.1.1";	
-		string port1 = "1111";
+		string main_ip = "1.1.1.1";	
+		string main_port1 = "11111";
+		string main_port2 = "22222";
 
-		string ip2 = "1.1.1.1";
-		string port2 = "2222";
+		string sub_ip = "2.2.2.2";
+		string sub_port = "33333";
 
-		string ip3 = "3.3.3.3";
-		string port3 = "3333";
+        TestSystem.Print("Enter를 누르면 시작합니다.\n");
+        TestSystem.GetCommand();
 #else
-		TestSystem.Print("MainServer의 First UDP 주소\n");
+        TestSystem.Print("MainServer의 UDP 주소\n");
 		TestSystem.Print("  IP 입력 : ");
-		string ip1 = TestSystem.GetCommand();
-		TestSystem.Print("  Port 입력 : ");
-		string port1 = TestSystem.GetCommand();
-
-		TestSystem.PrintLine();
-
-		TestSystem.Print("MainServer의 Second UDP 주소\n");
-		TestSystem.Print("  IP 입력 : ");
-		string ip2 = TestSystem.GetCommand();
-		TestSystem.Print("  Port 입력 : ");
-		string port2 = TestSystem.GetCommand();
+		string main_ip = TestSystem.GetCommand();
+		TestSystem.Print("  First Port 입력 : ");
+        string main_port1 = TestSystem.GetCommand();
+        TestSystem.Print("  Second Port 입력 : ");
+        string main_port2 = TestSystem.GetCommand();
 
 		TestSystem.PrintLine();
 
 		TestSystem.Print("SubServer의 UDP 주소\n");
 		TestSystem.Print("  IP 입력 : ");
-		string ip3 = TestSystem.GetCommand();
+		string sub_ip = TestSystem.GetCommand();
 		TestSystem.Print("  Port 입력 : ");
-		string port3 = TestSystem.GetCommand();
+		string sub_port = TestSystem.GetCommand();
 
 		TestSystem.PrintLine();
 #endif
@@ -85,9 +80,9 @@ public class Main : MonoBehaviour
 			TestSystem.PrintLine(a_msg);
 		};
 
-		Client testClient = new Client(new IPEndPoint(IPAddress.Parse(ip1), int.Parse(port1)),
-									   new IPEndPoint(IPAddress.Parse(ip2), int.Parse(port2)),
-									   new IPEndPoint(IPAddress.Parse(ip3), int.Parse(port3)));
+		Client testClient = new Client(new IPEndPoint(IPAddress.Parse(main_ip), int.Parse(main_port1)),
+                                       new IPEndPoint(IPAddress.Parse(main_ip), int.Parse(main_port2)),
+									   new IPEndPoint(IPAddress.Parse(sub_ip), int.Parse(sub_port)));
 		var result = testClient.StartTest();
 		TestSystem.PrintLine();
 		TestSystem.PrintLine("Test Result\n" + result.ToString() + "\n");

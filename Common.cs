@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -14,11 +15,13 @@ namespace NAT_Test
 		public delegate void OnEvent(string a_eventMessage);
 
 		public static int Message_Max_Length = 8 * 1024;
-
+		
+		// 응답을 기다리는 시간
 		public static int Timeout_Ms = 5 * 1000;
-
+		
+		// 재전송 주기 (UDP Drop 대비)
 		public static int Retransmission_Interval_Ms = 1000;
-
+		
 		public static Formatting JsonFormatting = Formatting.None;
 
 		public static Random Random = new Random();
@@ -69,15 +72,18 @@ namespace NAT_Test
 			public Message m_message;
 		}
 
+		static readonly IPEndPoint AnyAddr = new IPEndPoint(IPAddress.Any, 0);
 		Socket m_socket = null;
 		SocketAsyncEventArgs m_recvArgs = new SocketAsyncEventArgs();
 		Queue<RecvedMessage> m_recvedMessageQueue = new Queue<RecvedMessage>();
 		Semaphore m_recvedEvent = new Semaphore(0, int.MaxValue);
 
+
 		public SocketIo(Socket a_sock)
 		{
 			m_socket = a_sock;
 		}
+
 
 		public void Start()
 		{
@@ -85,38 +91,52 @@ namespace NAT_Test
 			m_recvArgs.SetBuffer(recvBuf, 0, recvBuf.Length);
 
 			if (m_socket.ProtocolType == ProtocolType.Tcp) {
+				// ...
 			}
 			else {
 				m_recvArgs.Completed += (object a_sender, SocketAsyncEventArgs a_evCtx) =>
 				{
-					if (a_evCtx.BytesTransferred < 0) {
-						m_socket.Close();
-						return;
-					}
-
-					a_evCtx.SocketError.ToString();
-					Int16 len = BitConverter.ToInt16(a_evCtx.Buffer, 0);
-					if (len + 2 != a_evCtx.BytesTransferred) {
-						Config.OnErrorDelegate("invalid payload length : " + len);
-					}
-					else {
-						string jsonMsg = Encoding.UTF8.GetString(a_evCtx.Buffer, 2, len);
-						Message msg = JsonConvert.DeserializeObject<Message>(jsonMsg);						
-						lock (m_recvedMessageQueue) {
-							m_recvedMessageQueue.Enqueue(new RecvedMessage {
-								m_sender = (IPEndPoint)a_evCtx.RemoteEndPoint,
-								m_message = msg
-							});
-						}
-						m_recvedEvent.Release();
-					}
-
-					m_recvArgs.SetBuffer(0, recvBuf.Length);
-					m_socket.ReceiveFromAsync(m_recvArgs);
+					ReceiveCompletion(a_evCtx);
 				};
-				m_recvArgs.RemoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
-				m_socket.ReceiveFromAsync(m_recvArgs);
+
+				m_recvArgs.RemoteEndPoint = AnyAddr;
+
+				if (m_socket.ReceiveFromAsync(m_recvArgs) == false)
+					ReceiveCompletion(m_recvArgs);
 			}
+		}
+
+
+		void ReceiveCompletion(SocketAsyncEventArgs a_evCtx)
+		{
+			int loopCount = -1;
+			do {
+				++loopCount;
+				Debug.Assert(a_evCtx.Equals(m_recvArgs));
+				if (a_evCtx.BytesTransferred < 0) {
+					m_socket.Close();
+					continue;
+				}
+
+				a_evCtx.SocketError.ToString();
+				Int16 len = BitConverter.ToInt16(a_evCtx.Buffer, 0);
+				if (len + 2 != a_evCtx.BytesTransferred) {
+					Config.OnErrorDelegate("invalid payload length : " + len);
+				}
+				else {
+					string jsonMsg = Encoding.UTF8.GetString(a_evCtx.Buffer, 2, len);
+					Message msg = JsonConvert.DeserializeObject<Message>(jsonMsg);
+					lock (m_recvedMessageQueue) {
+						m_recvedMessageQueue.Enqueue(new RecvedMessage {
+							m_sender = (IPEndPoint)a_evCtx.RemoteEndPoint,
+							m_message = msg
+						});
+					}
+					m_recvedEvent.Release();
+				}
+				m_recvArgs.SetBuffer(0, Config.Message_Max_Length);
+				m_recvArgs.RemoteEndPoint = AnyAddr;
+			} while (m_socket.ReceiveFromAsync(m_recvArgs) == false);
 		}
 
 
@@ -157,11 +177,19 @@ namespace NAT_Test
 			ioArgs.RemoteEndPoint = a_dest;
 			ioArgs.Completed += (object a_sender, SocketAsyncEventArgs a_evCtx) =>
 			{
-				if (a_evCtx.SocketError != SocketError.Success) {
-					Config.OnErrorDelegate("SendCompletion Error : " + a_evCtx.SocketError.ToString());
-				}
+				SendCompletion(a_evCtx);
 			};
-			m_socket.SendToAsync(ioArgs);
+			if (m_socket.SendToAsync(ioArgs) == false)
+				SendCompletion(ioArgs);
+		}
+
+
+		void SendCompletion(SocketAsyncEventArgs a_evCtx)
+		{
+			if (a_evCtx.SocketError != SocketError.Success)
+				Config.OnErrorDelegate("SendCompletion Error : " + a_evCtx.SocketError.ToString());
+			if (a_evCtx.BytesTransferred <= 0)
+				Config.OnErrorDelegate("SendCompletion Error : BytesTransferred=" + a_evCtx.BytesTransferred);
 		}
 	}
 }
