@@ -1,6 +1,5 @@
 # NAT_Test
 Client가 속한 NAT의 behavior를 테스트한다.
-중첩 NAT인 경우 최상단의 NAT를 테스트한다.
 
 
 # 테스트 시 주의사항
