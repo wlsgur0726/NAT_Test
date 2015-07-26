@@ -58,7 +58,7 @@ namespace NAT_Test
 
 		public static string ContextString(int a_contextID, int a_contextSeq)
 		{
-			return "[" + String.Format("{0:X}", a_contextID) + ":" + a_contextSeq + "]";
+			return "[" + string.Format("{0:X}", a_contextID) + ":" + a_contextSeq + "]";
 		}
 	}
 
@@ -93,7 +93,7 @@ namespace NAT_Test
 				// ...
 			}
 			else {
-				TryReceiveFrom();
+				Try_ReceiveFrom();
 			}
 		}
 
@@ -107,7 +107,7 @@ namespace NAT_Test
 		}
 
 
-		void TryReceiveFrom()
+		void Try_ReceiveFrom()
 		{
 			Debug.Assert(m_socket.ProtocolType == ProtocolType.Udp);
 			Debug.Assert(m_socket.SocketType == SocketType.Dgram);
@@ -164,7 +164,7 @@ namespace NAT_Test
 			}
 			finally {
 				if (m_run)
-					TryReceiveFrom();
+					Try_ReceiveFrom();
 			}
 		}
 

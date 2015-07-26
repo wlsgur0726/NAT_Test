@@ -129,7 +129,7 @@ namespace NAT_Test
 					else {
 						interval = Config.Retransmission_Interval_Ms;
 						if (timeoutCount >= 5) {
-							Config.OnErrorDelegate("SubServer와의 통신이 되지 않고 있습니다.");
+							Config.OnErrorDelegate("SubServer와 통신이 되지 않고 있습니다.");
 							--timeoutCount;
 						}
 					}

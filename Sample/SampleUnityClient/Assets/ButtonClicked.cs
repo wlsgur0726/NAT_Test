@@ -13,7 +13,6 @@ public class ButtonClicked : MonoBehaviour
 	{
 		m_input = GameObject.Find("StdIn").GetComponent<InputField>();
 		m_output = GameObject.Find("StdOut").GetComponent<InputField>();
-		m_input.Select();
 		//m_output.enabled = false;
 	}
 	
@@ -24,7 +23,6 @@ public class ButtonClicked : MonoBehaviour
 
 		m_input.text = "";
 		m_input.MoveTextStart(false);
-		m_input.Select();
 	}
 
 	public void OnClearClicked()
@@ -38,6 +36,7 @@ public class ButtonClicked : MonoBehaviour
 		string str;
 		while (TestSystem.TryGetOutputString(out str)) {
 			m_output.text += str;
+			m_output.MoveTextEnd(false);
 		}
 
 		if (Input.GetKey(KeyCode.Escape)) {
