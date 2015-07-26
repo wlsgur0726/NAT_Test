@@ -220,9 +220,15 @@ namespace NAT_Test
 		void SendCompletion(IAsyncResult a_result)
 		{
 			Debug.Assert(this.Equals((SocketIo)a_result.AsyncState));
-			int transBytes = m_socket.EndSendTo(a_result);
-			if (transBytes <= 0)
-				Config.OnErrorDelegate("SendCompletion Error : transBytes=" + transBytes);
+			try {
+				int transBytes = m_socket.EndSendTo(a_result);
+				if (transBytes <= 0)
+					Config.OnErrorDelegate("SendCompletion Error : transBytes=" + transBytes);
+			}
+			catch (Exception e) {
+				if (m_run)
+					Config.OnErrorDelegate(e.ToString());
+			}
 		}
 	}
 }
