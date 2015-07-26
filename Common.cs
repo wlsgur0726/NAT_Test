@@ -15,13 +15,13 @@ namespace NAT_Test
 		public delegate void OnEvent(string a_eventMessage);
 
 		public static int Message_Max_Length = 8 * 1024;
-		
+
 		// 응답을 기다리는 시간
 		public static int Timeout_Ms = 5 * 1000;
-		
+
 		// 재전송 주기 (UDP Drop 대비)
 		public static int Retransmission_Interval_Ms = 1000;
-		
+
 		public static Formatting JsonFormatting = Formatting.None;
 
 		public static Random Random = new Random();
@@ -127,10 +127,12 @@ namespace NAT_Test
 					string jsonMsg = Encoding.UTF8.GetString(a_evCtx.Buffer, 2, len);
 					Message msg = JsonConvert.DeserializeObject<Message>(jsonMsg);
 					lock (m_recvedMessageQueue) {
-						m_recvedMessageQueue.Enqueue(new RecvedMessage {
-							m_sender = (IPEndPoint)a_evCtx.RemoteEndPoint,
-							m_message = msg
-						});
+						m_recvedMessageQueue.Enqueue(
+							new RecvedMessage {
+								m_sender = (IPEndPoint)a_evCtx.RemoteEndPoint,
+								m_message = msg
+							}
+						);
 					}
 					m_recvedEvent.Release();
 				}
@@ -168,12 +170,12 @@ namespace NAT_Test
 			string jsonMessage = JsonConvert.SerializeObject(a_message, Config.JsonFormatting);
 			byte[] data = Encoding.UTF8.GetBytes(jsonMessage);
 			byte[] len = BitConverter.GetBytes((Int16)data.Length);
-			var bufList = new List<ArraySegment<byte>>();
-			bufList.Add(new ArraySegment<byte>(len));
-			bufList.Add(new ArraySegment<byte>(data));
+			byte[] packet = new byte[data.Length + len.Length];
+			len.CopyTo(packet, 0);
+			data.CopyTo(packet, len.Length);
 
 			SocketAsyncEventArgs ioArgs = new SocketAsyncEventArgs();
-			ioArgs.BufferList = bufList;
+			ioArgs.SetBuffer(packet, 0, packet.Length);
 			ioArgs.RemoteEndPoint = a_dest;
 			ioArgs.Completed += (object a_sender, SocketAsyncEventArgs a_evCtx) =>
 			{
