@@ -74,9 +74,10 @@ namespace NAT_Test
 
 		static readonly IPEndPoint AnyAddr = new IPEndPoint(IPAddress.Any, 0);
 		Socket m_socket = null;
-		SocketAsyncEventArgs m_recvArgs = new SocketAsyncEventArgs();
+		byte[] m_recvBuffer = new byte[Config.Message_Max_Length];
 		Queue<RecvedMessage> m_recvedMessageQueue = new Queue<RecvedMessage>();
 		Semaphore m_recvedEvent = new Semaphore(0, int.MaxValue);
+		volatile bool m_run = false;
 
 
 		public SocketIo(Socket a_sock)
@@ -87,58 +88,84 @@ namespace NAT_Test
 
 		public void Start()
 		{
-			byte[] recvBuf = new byte[Config.Message_Max_Length];
-			m_recvArgs.SetBuffer(recvBuf, 0, recvBuf.Length);
-
+			m_run = true;
 			if (m_socket.ProtocolType == ProtocolType.Tcp) {
 				// ...
 			}
 			else {
-				m_recvArgs.Completed += (object a_sender, SocketAsyncEventArgs a_evCtx) =>
-				{
-					ReceiveCompletion(a_evCtx);
-				};
-
-				m_recvArgs.RemoteEndPoint = AnyAddr;
-
-				if (m_socket.ReceiveFromAsync(m_recvArgs) == false)
-					ReceiveCompletion(m_recvArgs);
+				TryReceiveFrom();
 			}
 		}
 
 
-		void ReceiveCompletion(SocketAsyncEventArgs a_evCtx)
+		public void Stop()
 		{
-			int loopCount = -1;
-			do {
-				++loopCount;
-				Debug.Assert(a_evCtx.Equals(m_recvArgs));
-				if (a_evCtx.BytesTransferred < 0) {
-					m_socket.Close();
-					continue;
-				}
+			Debug.Assert(m_run);
 
-				a_evCtx.SocketError.ToString();
-				Int16 len = BitConverter.ToInt16(a_evCtx.Buffer, 0);
-				if (len + 2 != a_evCtx.BytesTransferred) {
-					Config.OnErrorDelegate("invalid payload length : " + len);
+			m_run = false;
+			m_socket.Close();
+		}
+
+
+		void TryReceiveFrom()
+		{
+			Debug.Assert(m_socket.ProtocolType == ProtocolType.Udp);
+			Debug.Assert(m_socket.SocketType == SocketType.Dgram);
+
+			try {
+				EndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+				m_socket.BeginReceiveFrom(m_recvBuffer,
+										  0,
+										  m_recvBuffer.Length,
+										  SocketFlags.None,
+										  ref sender,
+										  ReceiveCompletion,
+										  this);
+			}
+			catch (Exception e) {
+				Config.OnErrorDelegate(e.ToString());
+			}
+		}
+
+
+		void ReceiveCompletion(IAsyncResult a_result)
+		{
+			Debug.Assert(this.Equals((SocketIo)a_result.AsyncState));
+			try {
+				EndPoint sender = new IPEndPoint(IPAddress.Any, 0);
+				int recvedBytes = m_socket.EndReceiveFrom(a_result, ref sender);
+				if (recvedBytes <= 0) {
+					if (m_run)
+						Config.OnErrorDelegate("ReceiveCompletion Error : recvedBytes=" + recvedBytes);
 				}
 				else {
-					string jsonMsg = Encoding.UTF8.GetString(a_evCtx.Buffer, 2, len);
-					Message msg = JsonConvert.DeserializeObject<Message>(jsonMsg);
-					lock (m_recvedMessageQueue) {
-						m_recvedMessageQueue.Enqueue(
-							new RecvedMessage {
-								m_sender = (IPEndPoint)a_evCtx.RemoteEndPoint,
-								m_message = msg
-							}
-						);
+					Int16 len = BitConverter.ToInt16(m_recvBuffer, 0);
+					if (len + 2 != recvedBytes) {
+						Config.OnErrorDelegate("invalid payload : length=" + len);
 					}
-					m_recvedEvent.Release();
+					else {
+						string jsonMsg = Encoding.UTF8.GetString(m_recvBuffer, 2, len);
+						Message msg = JsonConvert.DeserializeObject<Message>(jsonMsg);
+						lock (m_recvedMessageQueue) {
+							m_recvedMessageQueue.Enqueue(
+								new RecvedMessage {
+									m_sender = (IPEndPoint)sender,
+									m_message = msg
+								}
+							);
+						}
+						m_recvedEvent.Release();
+					}
 				}
-				m_recvArgs.SetBuffer(0, Config.Message_Max_Length);
-				m_recvArgs.RemoteEndPoint = AnyAddr;
-			} while (m_socket.ReceiveFromAsync(m_recvArgs) == false);
+			}
+			catch (Exception e) {
+				if (m_run)
+					Config.OnErrorDelegate(e.ToString());
+			}
+			finally {
+				if (m_run)
+					TryReceiveFrom();
+			}
 		}
 
 
@@ -174,24 +201,28 @@ namespace NAT_Test
 			len.CopyTo(packet, 0);
 			data.CopyTo(packet, len.Length);
 
-			SocketAsyncEventArgs ioArgs = new SocketAsyncEventArgs();
-			ioArgs.SetBuffer(packet, 0, packet.Length);
-			ioArgs.RemoteEndPoint = a_dest;
-			ioArgs.Completed += (object a_sender, SocketAsyncEventArgs a_evCtx) =>
-			{
-				SendCompletion(a_evCtx);
-			};
-			if (m_socket.SendToAsync(ioArgs) == false)
-				SendCompletion(ioArgs);
+			try {
+				m_socket.BeginSendTo(packet,
+									 0,
+									 packet.Length,
+									 SocketFlags.None,
+									 a_dest,
+									 SendCompletion,
+									 this);
+			}
+			catch (Exception e) {
+				if (m_run)
+					Config.OnErrorDelegate(e.ToString());
+			}
 		}
 
 
-		void SendCompletion(SocketAsyncEventArgs a_evCtx)
+		void SendCompletion(IAsyncResult a_result)
 		{
-			if (a_evCtx.SocketError != SocketError.Success)
-				Config.OnErrorDelegate("SendCompletion Error : " + a_evCtx.SocketError.ToString());
-			if (a_evCtx.BytesTransferred <= 0)
-				Config.OnErrorDelegate("SendCompletion Error : BytesTransferred=" + a_evCtx.BytesTransferred);
+			Debug.Assert(this.Equals((SocketIo)a_result.AsyncState));
+			int transBytes = m_socket.EndSendTo(a_result);
+			if (transBytes <= 0)
+				Config.OnErrorDelegate("SendCompletion Error : transBytes=" + transBytes);
 		}
 	}
 }
