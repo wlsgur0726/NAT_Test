@@ -37,13 +37,18 @@ namespace NAT_Test
 						continue;
 					
 					IPEndPoint dst;
-					if (msg.AddressIsEmpty())
+					if (msg.AddressIsEmpty()) {
+						// Client로부터 직접 요청을 받은 경우
 						dst = sender;
-					else
+						msg.m_address = sender.Address.ToString();
+						msg.m_port = sender.Port;
+					}
+					else {
+						// Client의 요청을 MainServer로부터 전달받은 경우
 						dst = new IPEndPoint(IPAddress.Parse(msg.m_address), msg.m_port);
-
-					msg.m_address = sender.Address.ToString();
-					msg.m_port = sender.Port;
+						msg.m_address = dst.Address.ToString();
+						msg.m_port = dst.Port;
+					}
 					++msg.m_contextSeq;
 
 					if (msg.m_contextID != 0) { // 0은 Heartbeat이므로 출력하지 않는다.

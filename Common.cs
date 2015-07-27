@@ -17,10 +17,10 @@ namespace NAT_Test
 		public static int Message_Max_Length = 8 * 1024;
 
 		// 응답을 기다리는 시간
-		public static int Timeout_Ms = 5 * 1000;
+		public static int Timeout_Ms = 10 * 1000;
 
 		// 재전송 주기 (UDP Drop 대비)
-		public static int Retransmission_Interval_Ms = 1000;
+		public static int Retransmission_Interval_Ms = 1500;
 
 		public static Formatting JsonFormatting = Formatting.None;
 

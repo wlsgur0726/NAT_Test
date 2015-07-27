@@ -99,7 +99,7 @@ namespace NAT_Test
 		//   - Address_and_Port_Dependent  :  목적지의 IP 또는 Port가 다르면 다른 외부주소로 매핑
 		public Behavior MappingBehavior = Behavior.None;
 
-		
+
 		// NAT에서 Inbound Traffic 발생 시
 		// 송신자의 주소에 따라 패킷을 필터링하는 방식.
 		//   - Endpoint_Independent        :  송신자의 주소에 상관없이 허용
@@ -188,8 +188,11 @@ namespace NAT_Test
 				CreateSocketIO(ProtocolType.Udp, out mainIO, out result.PrivateUdpAddress_1);
 
 				// Step 1. Filtering Behavior Test
-				if (Test_Step1(ref result, mainIO))
+				if (Test_Step1(ref result, mainIO)) {
+					if (result.PublicUdpAddress_1 != null)
+						goto Step4;
 					return result;
+				}
 
 				Debug.Assert(result.Exist_NAT);
 				Debug.Assert(result.FilteringBehavior != TestResult.Behavior.None);
@@ -209,6 +212,7 @@ namespace NAT_Test
 
 				Debug.Assert(result.MappingBehavior != TestResult.Behavior.None);
 
+			Step4:
 				// Step 4. Hairpin Test
 				Test_Step4(ref result, mainIO);
 
@@ -540,10 +544,13 @@ namespace NAT_Test
 					return true;
 				}
 				else {
-					bool isPrivate1 = IsLocalAddress(a_testResult.PrivateUdpAddress_1,
+					bool isPrivate1 = a_testResult.Exist_NAT
+								   && IsLocalAddress(a_testResult.PrivateUdpAddress_1,
 													 a_testResult.PublicUdpAddress_4);
-					bool isPrivate2 = IsLocalAddress(a_testResult.PrivateUdpAddress_2,
+					bool isPrivate2 = a_testResult.Exist_NAT
+								   && IsLocalAddress(a_testResult.PrivateUdpAddress_2,
 													 a_testResult.PublicUdpAddress_5);
+
 					if (isPrivate1 || isPrivate2) {
 						// 송신자 주소가 내부주소인 경우
 						a_testResult.Supported_Hairpin = TestResult.Hairpin.Available_Communication;
