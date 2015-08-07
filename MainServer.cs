@@ -34,7 +34,7 @@ namespace NAT_Test
 			public IPEndPoint m_address = null;
 			public SocketPoller m_poller = new SocketPoller();
 			Thread m_thread = null;
-
+			
 			public Worker(ProtocolType a_protocol,
 						  IPEndPoint a_bindAddress,
 						  ParameterizedThreadStart a_work)
@@ -43,7 +43,6 @@ namespace NAT_Test
 				m_address = (IPEndPoint)m_socket.LocalEndPoint;
 
 				m_thread = new Thread(a_work);
-				m_thread.Start(this);
 			}
 
 			public void Start()
@@ -55,6 +54,33 @@ namespace NAT_Test
 			{
 				m_poller.Stop();
 				m_thread.Join();
+			}
+		}
+
+
+
+		class ResponseParameter
+		{
+			public Socket m_sock;
+			public Worker m_worker;
+			public IPEndPoint m_dest;
+			public Message m_msg;
+			public Message.SenderType m_senderType;
+			public string m_responseType;
+
+			public ResponseParameter(Socket a_sock,
+									 Worker a_worker,
+									 IPEndPoint a_dest,
+									 Message a_msg,
+									 Message.SenderType a_senderType,
+									 string a_responseType)
+			{
+				m_sock = a_sock;
+				m_worker = a_worker;
+				m_dest = a_dest;
+				m_msg = a_msg;
+				m_senderType = a_senderType;
+				m_responseType = a_responseType;
 			}
 		}
 
@@ -136,36 +162,52 @@ namespace NAT_Test
 
 
 
-		static bool SendResponse(Socket a_sock,
-								 Worker a_worker,
-								 IPEndPoint a_dest,
-								 Message a_msg)
+		static void SendResponse(ResponseParameter a_param)
 		{
-			bool r = true;
-			SocketPoller poller = a_worker.m_poller;
-			switch (a_sock.ProtocolType) {
-				case ProtocolType.Tcp:
-					if (poller.IsRegstered(a_sock) == false) {
-						if (poller.ConnectAndSend(a_sock, a_dest, a_msg) == false)
-							r = false;
-					}
-					else {
-						if (poller.Send(a_sock, a_msg, true) == false)
-							r = false;
-					}
-					poller.Close(a_sock);
-					break;
+			Thread t = new Thread((object a_param2) =>
+			{
+				ResponseParameter param = (ResponseParameter)a_param2;
+				bool r = true;
 
-				case ProtocolType.Udp:
-					if (poller.SendTo(a_sock, a_dest, a_msg, false) == false)
-						r = false;
-					break;
+				param.m_msg.m_senderType = param.m_senderType;
+				string portname = GetName(param.m_sock);
+				string ctxstr = Message.ContextString(param.m_msg);
+				Config.OnEventDelegate(portname
+					+ param.m_responseType + " to "
+					+ param.m_dest.ToString() + ctxstr);
 
-				default:
-					Debug.Assert(false);
-					break;
-			}
-			return r;
+				SocketPoller poller = param.m_worker.m_poller;
+				switch (param.m_sock.ProtocolType) {
+					case ProtocolType.Tcp:
+						if (poller.IsRegstered(param.m_sock) == false) {
+							r = poller.ConnectAndSend(param.m_sock,
+													  param.m_dest,
+													  param.m_msg);
+						}
+						else {
+							r = poller.Send(param.m_sock,
+											param.m_msg,
+											true);
+						}
+						break;
+
+					case ProtocolType.Udp:
+						r = poller.SendTo(param.m_sock,
+										  param.m_dest,
+										  param.m_msg, false);
+						break;
+
+					default:
+						Debug.Assert(false);
+						break;
+				}
+
+				if (r == false)
+					Config.OnEventDelegate(portname + "Faild " + param.m_responseType + ctxstr);
+			});
+
+			t.IsBackground = true;
+			t.Start(a_param);
 		}
 
 
@@ -186,7 +228,7 @@ namespace NAT_Test
 				Message msg;
 				IPEndPoint sender;
 				Socket sock;
-				bool isTimeout = ! worker.m_poller.WaitForMessage(Config.Timeout_Ms,
+				bool isTimeout = ! worker.m_poller.WaitForMessage(Config.Server_Poll_Timeout_Ms,
 																  out msg,
 																  out sock,
 																  out sender);
@@ -199,35 +241,45 @@ namespace NAT_Test
 				msg.m_address = sender.Address.ToString();
 				msg.m_port = sender.Port;
 
-				Socket resSock1 = sock;
-				Socket resSock2 = null;
-				Socket passSock = null;
-				Worker worker1 = worker;
-				Worker worker2 = null;
-				Worker passWorker = null;
-				string portName1 = GetName(resSock1);
-				string portName2 = null;
-				string passPortName = null;
-				IPEndPoint pass = null;
-
+				ResponseParameter p1 = null;
+				ResponseParameter p2 = null;
+				ResponseParameter p3 = null;
+				
+				p1 = new ResponseParameter(sock,
+										   worker,
+										   sender,
+										   new Message(msg),
+										   Message.SenderType.MainServer_FirstPort,
+										   "Response");
 				switch (protocol) {
-					case ProtocolType.Tcp:
-						resSock2 = Function.CreateSocket(ProtocolType.Tcp, null, false);
-						passSock = Function.CreateSocket(ProtocolType.Tcp, null, false);
-						passWorker = worker2 = worker1;
-						portName2 = GetName(resSock2);
-						passPortName = GetName(passSock);
-						pass = m_subServerAddr_tcp;
+					case ProtocolType.Tcp:						
+						p2 = new ResponseParameter(Function.CreateSocket(ProtocolType.Tcp, null, false),
+												   worker,
+												   sender,
+												   new Message(msg),
+												   Message.SenderType.MainServer_SecondPort,
+												   "Response");
+						p3 = new ResponseParameter(Function.CreateSocket(ProtocolType.Tcp, null, false),
+												   worker,
+												   m_subServerAddr_tcp,
+												   new Message(msg),
+												   Message.SenderType.SubServer,
+												   "Pass");
 						break;
 
 					case ProtocolType.Udp:
-						resSock2 = m_secondUdp.m_socket;
-						passSock = m_subServerUdp.m_socket;
-						worker2 = m_secondUdp;
-						passWorker = m_subServerUdp;
-						portName2 = GetName(resSock2);
-						passPortName = GetName(passSock);
-						pass = m_subServerAddr_udp;
+						p2 = new ResponseParameter(m_secondUdp.m_socket,
+												   m_secondUdp,
+												   sender,
+												   new Message(msg),
+												   Message.SenderType.MainServer_SecondPort,
+												   "Response");
+						p3 = new ResponseParameter(m_subServerUdp.m_socket,
+												   m_subServerUdp,
+												   m_subServerAddr_udp,
+												   new Message(msg),
+												   Message.SenderType.SubServer,
+												   "Pass");
 						break;
 
 					default:
@@ -235,23 +287,12 @@ namespace NAT_Test
 						break;
 				}
 
-				string ctxstr = " " + Message.ContextString(msg.m_contextID, msg.m_contextSeq);
-				Config.OnEventDelegate(portName1 + "Requested from " + sender.ToString() + ctxstr);
+				string ctxstr = " " + Message.ContextString(msg);
+				Config.OnEventDelegate(GetName(sock) + "Requested from " + sender.ToString() + ctxstr);
 
-				Config.OnEventDelegate(portName2 + "Response to " + sender.ToString() + ctxstr);
-				msg.m_senderType = Message.SenderType.MainServer_SecondPort;
-				if (SendResponse(resSock2, worker2, sender, msg) == false)
-					Config.OnEventDelegate(portName2 + "Faild response" + ctxstr);
-
-				Config.OnEventDelegate(portName1 + "Response to " + sender.ToString() + ctxstr);
-				msg.m_senderType = Message.SenderType.MainServer_FirstPort;
-				if (SendResponse(resSock1, worker1, sender, msg) == false)
-					Config.OnEventDelegate(portName1 + "Faild response" + ctxstr);
-
-				Config.OnEventDelegate(passPortName + "Pass to " + sender.ToString() + ctxstr);
-				msg.m_senderType = Message.SenderType.SubServer;
-				if (SendResponse(passSock, passWorker, pass, msg) == false)
-					Config.OnEventDelegate(passPortName + "Faild pass" + ctxstr);
+				SendResponse(p1);
+				SendResponse(p2);
+				SendResponse(p3);
 			}
 		}
 
@@ -273,7 +314,7 @@ namespace NAT_Test
 				Message msg;
 				Socket sock;
 				IPEndPoint sender;
-				bool isTimeout = ! worker.m_poller.WaitForMessage(Config.Timeout_Ms,
+				bool isTimeout = ! worker.m_poller.WaitForMessage(Config.Server_Poll_Timeout_Ms,
 																  out msg,
 																  out sock,
 																  out sender);
@@ -298,14 +339,13 @@ namespace NAT_Test
 						break;
 				}
 
-				string portName = GetName(sock);
-				string ctxstr = " " + Message.ContextString(msg.m_contextID, msg.m_contextSeq);
-				Config.OnEventDelegate(portName + "Requested from " + sender.ToString() + ctxstr);
-
-				Config.OnEventDelegate(portName + "Response to " + sender.ToString() + ctxstr);
-				if (SendResponse(resSock, worker, sender, msg) == false)
-					Config.OnEventDelegate(portName + "Faild response" + ctxstr);
-
+				ResponseParameter param = new ResponseParameter(resSock,
+																worker,
+																sender,
+																new Message(msg),
+																Message.SenderType.Client_SecondPort,
+																"Response");
+				SendResponse(param);
 			}
 		}
 
@@ -313,19 +353,28 @@ namespace NAT_Test
 
 		class Heartbeat
 		{
+			string m_name;
 			int m_timeoutCount = 0;
 			public SocketPoller m_poller = new SocketPoller();
 
-			public void WaitForInterval()
+			public Heartbeat(string a_name)
+			{
+				m_name = a_name;
+			}
+
+			public void WaitForInterval(string a_errComment)
 			{
 				int interval;
-				if (m_timeoutCount == 0)
-					interval = Config.Timeout_Ms;
+				if (m_timeoutCount == 0) {
+					interval = Math.Max(Config.Response_Timeout_Ms,
+										Config.Retransmission_Interval_Ms);
+				}
 				else {
 					interval = Config.Retransmission_Interval_Ms;
-					if (m_timeoutCount >= 5) {
-						Config.OnErrorDelegate("SubServer와 통신이 되지 않고 있습니다.");
-						--m_timeoutCount;
+					const int WarningCount = 5;
+					if (m_timeoutCount >= WarningCount) {
+						Config.OnErrorDelegate(m_name + "Cannot communicate with SubServer. " + a_errComment);
+						m_timeoutCount = WarningCount - 1;
 					}
 				}
 				Thread.Sleep(interval);
@@ -357,25 +406,34 @@ namespace NAT_Test
 				dest = m_subServerAddr_tcp;
 			}
 
-			Heartbeat heartbeat = new Heartbeat();
+			Heartbeat heartbeat = new Heartbeat(GetName(worker.m_socket));
 
 			Message ping = new Message();
 			int pingPongCtx = 0;
 			ping.m_contextSeq = 1;
 			ping.m_contextID = pingPongCtx;
-			
+
+			string errComment = "";
 			while (m_run) {
-				heartbeat.WaitForInterval();
+				heartbeat.WaitForInterval(errComment);
 
 				ping.m_pingTime = System.Environment.TickCount;
 
 				bool succeedPing = false;
 				switch (protocol) {
 					case ProtocolType.Tcp:
-						if (worker.m_socket.Connected)
+						if (worker.m_poller.IsRegstered(worker.m_socket))
 							succeedPing = worker.m_poller.Send(worker.m_socket, ping, true);
-						else
+						else {
+							if (ping.m_contextSeq > 1) {
+								ping.m_contextSeq = 1;
+								worker.m_socket.Close();
+								worker.m_socket = Function.CreateSocket(ProtocolType.Tcp,
+																		null,
+																		false);
+							}
 							succeedPing = worker.m_poller.ConnectAndSend(worker.m_socket, dest, ping);
+						}
 						break;
 
 					case ProtocolType.Udp:
@@ -387,6 +445,7 @@ namespace NAT_Test
 						break;
 				}
 				if (succeedPing == false) {
+					errComment = "failed request.";
 					heartbeat.Timeout();
 					continue;
 				}
@@ -394,17 +453,19 @@ namespace NAT_Test
 				Message pong;
 				Socket sock;
 				IPEndPoint sender;
-				bool isTimeout = ! worker.m_poller.WaitForMessage(Config.Timeout_Ms,
+				bool isTimeout = ! worker.m_poller.WaitForMessage(Config.Response_Timeout_Ms,
 																  out pong,
 																  out sock,
 																  out sender);
 				if (isTimeout) {
+					errComment = "response timeout.";
 					heartbeat.Timeout();
 					continue;
 				}
 
 				if (pong.m_contextID != pingPongCtx) {
 					heartbeat.Timeout();
+					errComment = "wrong message.";
 					Config.OnErrorDelegate("잘못된 메시지를 수신 : " + pong.ToString());
 					continue;
 				}

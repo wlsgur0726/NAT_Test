@@ -16,10 +16,13 @@ namespace NAT_Test
 		public static int Message_Max_Length = 8 * 1024;
 
 		// 응답을 기다리는 시간
-		public static int Timeout_Ms = 10 * 1000;
+		public static int Response_Timeout_Ms = 30 * 1000;
 
-		// 재전송 주기 (UDP Drop 대비)
-		public static int Retransmission_Interval_Ms = 1500;
+		// 재전송 주기 (UDP Drop 대비 => 단순히 무조건 재전송)
+		public static int Retransmission_Interval_Ms = Response_Timeout_Ms / 5;
+
+		// 서버의 폴링 타임아웃 (서버 종료에 걸리는 시간과 관련)
+		public static int Server_Poll_Timeout_Ms = 1000;
 
 		public static Formatting JsonFormatting = Formatting.None;
 
@@ -60,9 +63,30 @@ namespace NAT_Test
 		public SenderType m_senderType = SenderType.Do_Not_Care;
 		public string m_otherMessage = "";
 
+
+		public Message()
+		{
+		}
+
+		public Message(Message a_src)
+		{
+			m_contextID = a_src.m_contextID;
+			m_contextSeq = a_src.m_contextSeq;
+			m_pingTime = a_src.m_pingTime;
+			m_address = a_src.m_address;
+			m_port = a_src.m_port;
+			m_senderType = a_src.m_senderType;
+			m_otherMessage = a_src.m_otherMessage;
+		}
+
 		public bool AddressIsEmpty()
 		{
 			return m_port == -1 || m_address.Equals("");
+		}
+
+		public static string ContextString(Message a_msg)
+		{
+			return ContextString(a_msg.m_contextID, a_msg.m_contextSeq);
 		}
 
 		public static string ContextString(int a_contextID,
@@ -139,6 +163,7 @@ namespace NAT_Test
 		public void Start_Acceptor(Socket a_sock)
 		{
 			Debug.Assert(a_sock != null);
+			a_sock.Listen(int.MaxValue);
 			SocketContext sockCtx = new SocketContext(a_sock);
 			lock (m_sockets) {
 				m_sockets.Add(a_sock, sockCtx);
@@ -174,8 +199,7 @@ namespace NAT_Test
 			}
 
 			lock(m_acceptedSocketQueue) {
-				while (m_acceptedSocketQueue.Count > 0)
-					m_acceptedSocketQueue.Dequeue().Close();
+				m_acceptedSocketQueue.Clear();
 			}
 		}
 
@@ -187,7 +211,7 @@ namespace NAT_Test
 			}
 			catch (Exception e) {
 				if (a_sockCtx.m_closed == false)
-					Config.OnErrorDelegate(e.ToString());
+					Config.OnErrorDelegate(e.ToString() + "\n");
 			}
 		}
 
@@ -201,10 +225,12 @@ namespace NAT_Test
 					m_acceptedSocketQueue.Enqueue(newSocket);
 				}
 				m_acceptedEvent.Release();
+
+				Start(newSocket);
 			}
 			catch (Exception e) {
 				if (sockCtx.m_closed == false)
-					Config.OnErrorDelegate(e.ToString());
+					Config.OnErrorDelegate(e.ToString() + "\n");
 			}
 			finally {
 				if (sockCtx.m_closed == false)
@@ -220,7 +246,7 @@ namespace NAT_Test
 			}
 			catch (Exception e) {
 				if (a_sockCtx.m_closed == false)
-					Config.OnErrorDelegate(e.ToString());
+					Config.OnErrorDelegate(e.ToString() + "\n");
 			}
 		}
 
@@ -280,7 +306,7 @@ namespace NAT_Test
 			}
 			catch (Exception e) {
 				if (sockCtx.m_closed == false)
-					Config.OnErrorDelegate(e.ToString());
+					Config.OnErrorDelegate(e.ToString() + "\n");
 			}
 			finally {
 				if (sockCtx.m_closed == false)
@@ -296,7 +322,7 @@ namespace NAT_Test
 			}
 			catch (Exception e) {
 				if (a_sockCtx.m_closed == false)
-					Config.OnErrorDelegate(e.ToString());
+					Config.OnErrorDelegate(e.ToString() + "\n");
 			}
 		}
 
@@ -326,7 +352,7 @@ namespace NAT_Test
 			}
 			catch (Exception e) {
 				if (sockCtx.m_closed == false)
-					Config.OnErrorDelegate(e.ToString());
+					Config.OnErrorDelegate(e.ToString() + "\n");
 			}
 			finally {
 				if (sockCtx.m_closed == false)
@@ -404,6 +430,7 @@ namespace NAT_Test
 								   Message a_message)
 		{
 			try {
+				a_sock.SendTimeout = Config.Response_Timeout_Ms;
 				a_sock.Connect(a_dest);
 				Start(a_sock);
 				int transBytes = a_sock.Send(CreatePacket(a_message));
@@ -413,7 +440,7 @@ namespace NAT_Test
 				}
 			}
 			catch (Exception e) {
-				Config.OnErrorDelegate(e.ToString());
+				Config.OnErrorDelegate(e.ToString() + "\n");
 				return false;
 			}
 			return true;
@@ -456,7 +483,7 @@ namespace NAT_Test
 			}
 			catch (Exception e) {
 				if (sockCtx.m_closed == false)
-					Config.OnErrorDelegate(e.ToString());
+					Config.OnErrorDelegate(e.ToString() + "\n");
 				return false;
 			}
 			return true;
@@ -505,7 +532,7 @@ namespace NAT_Test
 			}
 			catch (Exception e) {
 				if (sockCtx.m_closed == false)
-					Config.OnErrorDelegate(e.ToString());
+					Config.OnErrorDelegate(e.ToString() + "\n");
 				return false;
 			}
 			return true;
@@ -524,7 +551,7 @@ namespace NAT_Test
 			}
 			catch (Exception e) {
 				if (sockCtx.m_closed == false)
-					Config.OnErrorDelegate(e.ToString());
+					Config.OnErrorDelegate(e.ToString() + "\n");
 			}
 		}
 

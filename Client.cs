@@ -38,6 +38,11 @@ namespace NAT_Test
 			Perfect
 		}
 
+
+		// 테스트 할 프로토콜
+		public ProtocolType Protocol = ProtocolType.Unknown;
+
+
 		// UDP Drop 등 예기치 못한 문제로 테스트를 끝까지 완료하지 못한 경우 false.
 		public bool Complete = false;
 
@@ -108,6 +113,7 @@ namespace NAT_Test
 		public override string ToString()
 		{
 			string str = base.ToString()
+				+ "\n Protocol                 :  " + Protocol
 				+ "\n Complete                 :  " + Complete
 				+ "\n Comment                  :  " + Comment
 				+ "\n Available_Communication  :  " + Available_Communication
@@ -156,6 +162,10 @@ namespace NAT_Test
 			if (a_mainServer_port1==null || a_mainServer_port2==null || a_subServer==null)
 				throw new ArgumentNullException();
 
+			// 현재 지원 가능한 프로토콜인지 체크.
+			if (a_protocol!=ProtocolType.Udp && a_protocol!=ProtocolType.Tcp)
+				throw new ArgumentException(a_protocol + " is not supported.");
+
 			// Address_and_Port_Dependent 여부를 가려내려면 MainServer는 동일한 IP에 서로 다른 두 Port를 사용해야 한다.
 			if (a_mainServer_port1.Address.Equals(a_mainServer_port2.Address) == false) {
 				throw new ArgumentException("a_mainServer_port1과 a_mainServer_port2의 IP가 다릅니다."
@@ -186,8 +196,9 @@ namespace NAT_Test
 		public TestResult StartTest()
 		{
 			Debug.Assert(m_protocol==ProtocolType.Tcp || m_protocol==ProtocolType.Udp);
-			m_testResult = new TestResult();
 			m_poller = new SocketPoller();
+			m_testResult = new TestResult();
+			m_testResult.Protocol = m_protocol;
 
 			// 소켓 준비
 			m_requester = Function.CreateSocket(m_protocol,
@@ -433,7 +444,6 @@ namespace NAT_Test
 									 out resAddr);
 			}
 			else {
-				m_requester = ReuseSocket(m_requester);
 				Step4_ReqAndWait_TCP(secondRequester,
 									 m_testResult.PublicAddress_1,
 									 Message.SenderType.Client_SecondPort,
@@ -510,10 +520,10 @@ namespace NAT_Test
 
 		Socket ReuseSocket(Socket a_socket)
 		{
-			IPEndPoint addr = (IPEndPoint)a_socket.LocalEndPoint;
-			m_poller.Close(a_socket);
-			
-			Socket ret = Function.CreateSocket(m_protocol, addr, true);
+			m_poller.Close(a_socket);			
+			Socket ret = Function.CreateSocket(m_protocol,
+											   m_testResult.PrivateAddress_1,
+											   true);
 			return ret;
 		}
 
@@ -571,14 +581,32 @@ namespace NAT_Test
 			timer.Elapsed += new ElapsedEventHandler((object a_sender, ElapsedEventArgs a_eArgs) =>
 			{
 				Config.OnEventDelegate(
-					" request to " + a_dest.ToString() + "... " +
-					Message.ContextString(req.m_contextID, req.m_contextSeq));
+					" request to " + a_dest.ToString() + "... " + Message.ContextString(req));
 				req.m_pingTime = System.Environment.TickCount;
 				m_poller.SendTo(a_socket, a_dest, req, false);
 			});
 			timer.Start();
 
 			return timer;
+		}
+
+
+
+		bool TCPRequest(Socket a_sock,
+						IPEndPoint a_dest,
+						Message.SenderType a_senderType,
+						out int a_ctxID)
+		{
+			Message req = NewRequest(a_senderType, out a_ctxID);
+			Config.OnEventDelegate(
+					" request to " + m_mainServer_port1.ToString() + "... " + Message.ContextString(req));
+
+			if (m_poller.ConnectAndSend(a_sock, a_dest, req) == false) {
+				Config.OnEventDelegate("Failed request.");
+				return false;
+			}
+
+			return true;
 		}
 
 
@@ -638,10 +666,9 @@ namespace NAT_Test
 				}
 				if (valid == false) {
 					a_timeoutMs -= (int)stopwatch.ElapsedMilliseconds;
-					if (a_timeoutMs > 0)
-						continue;
-					else
+					if (a_timeoutMs < 0)
 						a_timeoutMs = 0;
+					continue;
 				}
 
 				break;
@@ -668,7 +695,7 @@ namespace NAT_Test
 			//  - MainServer의 First Port
 			//  - MainServer의 Second Port
 			//  - SubServer
-			int recvTimeout = Config.Timeout_Ms;
+			int recvTimeout = Config.Response_Timeout_Ms;
 			bool isNotTimeout = true;
 			bool existNullAddr = true;
 			do {
@@ -680,21 +707,21 @@ namespace NAT_Test
 
 						if (a_response.m_sender.Equals(m_mainServer_port1)) {
 							if (m_testResult.PublicAddress_1 != null)
-								return true;
+								return false;
 							Config.OnEventDelegate(
 								"MainServer의 First Port로부터 Response" + addrstr + " 수신 성공. " + ctxstr);
 							m_testResult.PublicAddress_1 = a_response.m_publicAddress;
 						}
 						else if (a_response.m_sender.Equals(m_mainServer_port2)) {
 							if (m_testResult.PublicAddress_2 != null)
-								return true;
+								return false;
 							Config.OnEventDelegate(
 								"MainServer의 Second Port로부터 Response" + addrstr + " 수신 성공. " + ctxstr);
 							m_testResult.PublicAddress_2 = a_response.m_publicAddress;
 						}
 						else if (a_response.m_sender.Equals(m_subServer)) {
 							if (m_testResult.PublicAddress_3 != null)
-								return true;
+								return false;
 							Config.OnEventDelegate(
 								"SubServer로부터 Response" + addrstr + " 수신 성공. " + ctxstr);
 							m_testResult.PublicAddress_3 = a_response.m_publicAddress;
@@ -716,7 +743,6 @@ namespace NAT_Test
 		}
 
 
-
 		void Step1_ReqAndWait_TCP()
 		{
 			Debug.Assert(m_testResult.PublicAddress_1 == null);
@@ -725,25 +751,25 @@ namespace NAT_Test
 			int ctxID;
 
 			// MainServer의 First Port에게 Request를 시도
-			bool success = m_poller.ConnectAndSend(m_requester,
-												   m_mainServer_port1,
-												   NewRequest(Message.SenderType.Do_Not_Care, out ctxID));
-			if (success == false) {
-				Config.OnEventDelegate("요청 실패");
+			bool reqSuccess = TCPRequest(m_requester,
+										 m_mainServer_port1,
+										 Message.SenderType.Do_Not_Care,
+										 out ctxID);
+			if (reqSuccess == false)
 				return;
-			}
 
 			// 다음 3개의 EndPoint로부터 응답을 기다린다.
 			//  - MainServer의 First Port
 			//  - MainServer의 Second Port
 			//  - SubServer
-			int recvTimeout = Config.Timeout_Ms;
+			int recvTimeout = Config.Response_Timeout_Ms;
 			bool isNotTimeout = true;
 			bool existNullAddr = true;
 			do {
 				isNotTimeout = WaitForRecvEvent(ctxID, ref recvTimeout,
 					(Response a_response) =>
 					{
+						m_poller.Close(a_response.m_socket);
 						string ctxstr = a_response.GetContextString();
 						string addrstr = "(" + a_response.m_publicAddress.ToString() + ")";
 
@@ -793,7 +819,7 @@ namespace NAT_Test
 											  out ctxID);
 
 			// 응답을 기다림
-			int recvTimeout = Config.Timeout_Ms;
+			int recvTimeout = Config.Response_Timeout_Ms;
 			WaitForRecvEvent(ctxID, ref recvTimeout,
 				(Response a_response) =>
 				{
@@ -802,7 +828,7 @@ namespace NAT_Test
 						return false;
 					}
 					if (m_testResult.PublicAddress_2 != null)
-						return true;
+						return false;
 
 					string ctxstr = a_response.GetContextString();
 					string addrstr = "(" + a_response.m_publicAddress.ToString() + ")";
@@ -824,19 +850,19 @@ namespace NAT_Test
 			int ctxID;
 
 			// MainServer의 Second Port로 Request를 시도
-			bool success = m_poller.ConnectAndSend(m_requester,
-												   m_mainServer_port2,
-												   NewRequest(Message.SenderType.Do_Not_Care, out ctxID));
-			if (success == false) {
-				Config.OnEventDelegate("요청 실패");
+			bool reqSuccess = TCPRequest(m_requester,
+										 m_mainServer_port2,
+										 Message.SenderType.Do_Not_Care,
+										 out ctxID);
+			if (reqSuccess == false)
 				return;
-			}
 
 			// 응답을 기다림
-			int recvTimeout = Config.Timeout_Ms;
+			int recvTimeout = Config.Response_Timeout_Ms;
 			WaitForRecvEvent(ctxID, ref recvTimeout,
 				(Response a_response) =>
 				{
+					m_poller.Close(a_response.m_socket);
 					if (a_response.m_senderType != Message.SenderType.MainServer_SecondPort) {
 						Config.OnErrorDelegate("엉뚱한 sender : " + a_response.m_sender.ToString());
 						return false;
@@ -866,7 +892,7 @@ namespace NAT_Test
 											  out ctxID);
 
 			// 응답을 기다림
-			int recvTimeout = Config.Timeout_Ms;
+			int recvTimeout = Config.Response_Timeout_Ms;
 			WaitForRecvEvent(ctxID, ref recvTimeout,
 				(Response a_response) =>
 				{
@@ -875,7 +901,7 @@ namespace NAT_Test
 						return false;
 					}
 					if (m_testResult.PublicAddress_3 != null)
-						return true;
+						return false;
 
 					string ctxstr = a_response.GetContextString();
 					string addrstr = "(" + a_response.m_publicAddress.ToString() + ")";
@@ -897,19 +923,19 @@ namespace NAT_Test
 			int ctxID;
 
 			// SubServer에게 Request를 시도
-			bool success = m_poller.ConnectAndSend(m_requester,
-												   m_subServer,
-												   NewRequest(Message.SenderType.Do_Not_Care, out ctxID));
-			if (success == false) {
-				Config.OnEventDelegate("요청 실패");
+			bool reqSuccess = TCPRequest(m_requester,
+										 m_subServer,
+										 Message.SenderType.Do_Not_Care,
+										 out ctxID);
+			if (reqSuccess == false)
 				return;
-			}
 
 			// 응답을 기다림
-			int recvTimeout = Config.Timeout_Ms;
+			int recvTimeout = Config.Response_Timeout_Ms;
 			WaitForRecvEvent(ctxID, ref recvTimeout,
 				(Response a_response) =>
 				{
+					m_poller.Close(a_response.m_socket);
 					if (a_response.m_senderType != Message.SenderType.SubServer) {
 						Config.OnErrorDelegate("엉뚱한 sender : " + a_response.m_sender.ToString());
 						return false;
@@ -938,7 +964,7 @@ namespace NAT_Test
 											  a_senderType,
 											  out ctxID);
 			IPEndPoint sender = null;
-			int recvTimeout = Config.Timeout_Ms;
+			int recvTimeout = Config.Response_Timeout_Ms;
 			WaitForRecvEvent(ctxID, ref recvTimeout,
 				(Response a_response) =>
 				{
@@ -948,7 +974,7 @@ namespace NAT_Test
 					}
 
 					if (sender != null)
-						return true;
+						return false;
 
 					string ctxstr = a_response.GetContextString();
 					Config.OnEventDelegate(
@@ -969,21 +995,21 @@ namespace NAT_Test
 								  Message.SenderType a_senderType,
 								  out IPEndPoint a_publicAddress)
 		{
+			a_publicAddress = null;
 			int ctxID;
-			bool success = m_poller.ConnectAndSend(a_socket,
-												   a_reqDest,
-												   NewRequest(a_senderType, out ctxID));
-			if (success == false) {
-				Config.OnEventDelegate("요청 실패");
-				a_publicAddress = null;
+			bool reqSuccess = TCPRequest(a_socket,
+										 a_reqDest,
+										 a_senderType,
+										 out ctxID);
+			if (reqSuccess == false)
 				return;
-			}
 
 			IPEndPoint sender = null;
-			int recvTimeout = Config.Timeout_Ms;
+			int recvTimeout = Config.Response_Timeout_Ms;
 			WaitForRecvEvent(ctxID, ref recvTimeout,
 				(Response a_response) =>
 				{
+					m_poller.Close(a_response.m_socket);
 					if (a_response.m_senderType != a_senderType) {
 						Config.OnErrorDelegate("엉뚱한 sender : " + a_response.m_sender.ToString());
 						return false;

@@ -54,16 +54,15 @@ namespace NAT_Test
 					Message msg;
 					Socket sock;
 					IPEndPoint sender;
-					bool timeout = ! m_poller.WaitForMessage(Config.Timeout_Ms,
-															 out msg,
-															 out sock,
-															 out sender);
-					if (timeout)
+					bool isTimeout = ! m_poller.WaitForMessage(Config.Server_Poll_Timeout_Ms,
+															   out msg,
+															   out sock,
+															   out sender);
+					if (isTimeout)
 						continue;
 
 					string protocolName;
 					if (sock.ProtocolType == ProtocolType.Tcp) {
-						Debug.Assert(sock.Equals(tcpSock));
 						protocolName = "[TCP] ";
 					}
 					else {
@@ -98,7 +97,7 @@ namespace NAT_Test
 					}
 					else {
 						// Request 메시지인 경우
-						string ctxstr = " " + Message.ContextString(msg.m_contextID, msg.m_contextSeq);
+						string ctxstr = " " + Message.ContextString(msg);
 						Config.OnEventDelegate(protocolName + "Requested from " + sender.ToString() + ctxstr);
 						Config.OnEventDelegate(protocolName + "Response to " + dst.ToString() + ctxstr);
 
@@ -109,9 +108,8 @@ namespace NAT_Test
 														  SocketType.Stream,
 														  ProtocolType.Tcp);
 							if (m_poller.ConnectAndSend(newSocket, dst, msg) == false)
-								Config.OnEventDelegate(protocolName + "Failed response" + ctxstr);
+								Config.OnEventDelegate(protocolName + "Failed Response" + ctxstr);
 							m_poller.Close(sock);
-							m_poller.Close(newSocket);
 						}
 					}
 				}
