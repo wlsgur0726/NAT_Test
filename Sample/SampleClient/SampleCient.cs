@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
 using SampleCommon;
 using NAT_Test;
 
@@ -13,12 +10,13 @@ namespace SampleClient
 		{
 			Client testClient = null;
 			try {
-				if (args.Length < 3)
-					throw new ArgumentException("IP:Port 정보들을 인자로 넘겨주세요.");
+				if (args.Length < 4)
+					throw new ArgumentException("프로토콜과 IP:Port 정보들을 인자로 넘겨주세요.");
 
-				testClient = new NAT_Test.Client(Common.ParseURL(args[0]),
+				testClient = new NAT_Test.Client(Common.ParseProtocol(args[0]),
 												 Common.ParseURL(args[1]),
-												 Common.ParseURL(args[2]));
+												 Common.ParseURL(args[2]),
+												 Common.ParseURL(args[3]));
 				var result = testClient.StartTest();
 				Console.WriteLine("\n" + result.ToString());
 			}

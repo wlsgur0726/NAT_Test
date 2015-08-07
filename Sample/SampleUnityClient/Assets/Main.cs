@@ -1,9 +1,9 @@
 ﻿using UnityEngine;
-using System.Collections;
 using System.Threading;
 using System;
-using NAT_Test;
 using System.Net;
+using NAT_Test;
+using System.Net.Sockets;
 
 public class Main : MonoBehaviour
 {
@@ -29,7 +29,7 @@ public class Main : MonoBehaviour
 				m_terminate = false;
 				try {
 					TestSystem.PrintLine("================================");
-                    TestSystem.PrintLine("Start MainThread\n");
+					TestSystem.PrintLine("Start MainThread\n");
 					TestMain();
 				}
 				catch (Exception e) {
@@ -49,6 +49,10 @@ public class Main : MonoBehaviour
 	static void TestMain()
 	{
 #if false
+		// 테스트의 편의를 위해 하드코딩하는 경우
+
+		string protocol = "UDP";
+
 		string main_ip = "1.1.1.1";	
 		string main_port1 = "11111";
 		string main_port2 = "22222";
@@ -58,8 +62,13 @@ public class Main : MonoBehaviour
 
 		TestSystem.Print("Enter를 누르면 시작합니다.");
 		TestSystem.GetCommand();
+
 #else
-		TestSystem.Print("MainServer의 UDP 주소\n");
+		TestSystem.Print("테스트 할 프로토콜\n");
+		TestSystem.Print("  TCP 또는 UDP 입력 : ");
+		string protocol = TestSystem.GetCommand();
+
+		TestSystem.Print("MainServer의 주소\n");
 		TestSystem.Print("  IP 입력 : ");
 		string main_ip = TestSystem.GetCommand();
 		TestSystem.Print("  First Port 입력 : ");
@@ -69,14 +78,30 @@ public class Main : MonoBehaviour
 
 		TestSystem.PrintLine();
 
-		TestSystem.Print("SubServer의 UDP 주소\n");
+		TestSystem.Print("SubServer의 주소\n");
 		TestSystem.Print("  IP 입력 : ");
 		string sub_ip = TestSystem.GetCommand();
 		TestSystem.Print("  Port 입력 : ");
 		string sub_port = TestSystem.GetCommand();
 
 		TestSystem.PrintLine();
+
 #endif
+
+		ProtocolType protocolType;
+		{
+			string t = protocol.ToUpper();
+			switch (t) {
+				case "UDP":
+					protocolType = ProtocolType.Udp;
+					break;
+				case "TCP":
+					protocolType = ProtocolType.Tcp;
+					break;
+				default:
+					throw new ArgumentException("프로토콜 정보가 잘못되었습니다. (" + protocol + ")");
+			}
+		}
 
 		Config.OnEventDelegate = (string a_msg) =>
 		{
@@ -87,7 +112,8 @@ public class Main : MonoBehaviour
 			TestSystem.PrintLine(a_msg);
 		};
 
-		Client testClient = new Client(new IPEndPoint(IPAddress.Parse(main_ip), int.Parse(main_port1)),
+		Client testClient = new Client(protocolType,
+									   new IPEndPoint(IPAddress.Parse(main_ip), int.Parse(main_port1)),
 									   new IPEndPoint(IPAddress.Parse(main_ip), int.Parse(main_port2)),
 									   new IPEndPoint(IPAddress.Parse(sub_ip), int.Parse(sub_port)));
 		var result = testClient.StartTest();
