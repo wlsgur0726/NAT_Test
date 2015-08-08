@@ -599,7 +599,7 @@ namespace NAT_Test
 		{
 			Message req = NewRequest(a_senderType, out a_ctxID);
 			Config.OnEventDelegate(
-					" request to " + m_mainServer_port1.ToString() + "... " + Message.ContextString(req));
+					" request to " + a_dest.ToString() + "... " + Message.ContextString(req));
 
 			if (m_poller.ConnectAndSend(a_sock, a_dest, req) == false) {
 				Config.OnEventDelegate("Failed request.");
@@ -626,6 +626,8 @@ namespace NAT_Test
 			}
 		}
 
+		// 이 delegate에서는 유효한 메시지이면 true를,
+		// 중복수신, 잘못된 메시지 등의 경우는 false를 리턴한다.
 		delegate bool OnResponse(Response a_response);
 
 		bool WaitForRecvEvent(int a_contextID,
