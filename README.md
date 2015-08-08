@@ -1,5 +1,8 @@
 # NAT_Test
-Application 입장에서 자신이 속한 NAT의 behavior를 테스트한다.
+Application 입장에서 자신이 속한 NAT에 대해 다음 항목들을 조사한다.
+ - Address and Port Mapping Behavior ([1][글1],[2](https://tools.ietf.org/html/rfc4787#section-4.1))
+ - Filtering Behavior ([1][글2],[2](https://tools.ietf.org/html/rfc4787#section-5))
+ - Hairpin 지원여부 ([1][글2],[2](https://tools.ietf.org/html/rfc4787#section-6))
 
 
 ## 테스트 시 주의사항
@@ -27,7 +30,8 @@ Application 입장에서 자신이 속한 NAT의 behavior를 테스트한다.
 
 
 ## 참고 문서
- - 용어는 Netmanias Blog([1][글1],[2][글2])에 나오는 용어를 그대로 사용. (**EIM**=*Endpoint-Independent Mapping*, **APDF**=*Address and Port-Dependent Filtering*)
+ - 용어는 Netmanias Blog([1][글1],[2][글2])와 [RFC4787]에 나오는 용어를 그대로 사용. (**EIM**=*Endpoint-Independent Mapping*, **APDF**=*Address and Port-Dependent Filtering*)
+ - https://tools.ietf.org/html/rfc4787
  - https://docs.google.com/document/d/16O0IO39XICpGrHrGK9Vl_Fy5cgkjibZMzQjhY77j-HE/pub
  - http://www.netmanias.com/ko/?m=view&id=blog&no=5833
  - http://www.netmanias.com/ko/?m=view&id=blog&no=5839
@@ -35,6 +39,7 @@ Application 입장에서 자신이 속한 NAT의 behavior를 테스트한다.
  - http://www.netmanias.com/ko/?m=view&id=blog&no=5854
  - http://www.netmanias.com/ko/?m=view&id=blog&no=5856
 
+[RFC4787]: https://tools.ietf.org/html/rfc4787
 [글1]: http://www.netmanias.com/ko/?m=view&id=blog&no=5833
 [글2]: http://www.netmanias.com/ko/?m=view&id=blog&no=5839
 [SampleClient]: https://github.com/wlsgur0726/NAT_Test/tree/master/Sample/SampleClient
