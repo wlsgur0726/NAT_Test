@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
+using System;
 
 public class ButtonClicked : MonoBehaviour 
 {
@@ -11,8 +12,17 @@ public class ButtonClicked : MonoBehaviour
 		m_input = GameObject.Find("StdIn").GetComponent<InputField>();
 		m_output = GameObject.Find("StdOut").GetComponent<InputField>();
 		//m_output.enabled = false;
+
+		// 해상도에 따른 폰트 크기 조절
+		double screenSize = Math.Sqrt(Math.Pow(Screen.height, 2) + Math.Pow(Screen.width, 2));
+		int fontSize = (int)(screenSize / 50);
+		m_input.placeholder.GetComponent<Text>().fontSize = (int)(fontSize * 0.75);
+		m_input.textComponent.fontSize = fontSize;
+		m_output.textComponent.fontSize = fontSize;
+		GameObject.Find("EnterButton").GetComponent<Button>().GetComponentInChildren<Text>().fontSize = fontSize;
+		GameObject.Find("ClearButton").GetComponent<Button>().GetComponentInChildren<Text>().fontSize = fontSize;
 	}
-	
+
 	public void OnEnterClicked()
 	{
 		string newCommand = m_input.text;
